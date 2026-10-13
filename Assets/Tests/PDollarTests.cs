@@ -176,6 +176,59 @@ public class PDollarTests
     }
 
     // ------------------------------------------------------------------
+    // TEST 5b — Hình NHIỀU nét (lát cà chua: 1 vòng + 6 múi = 7 nét)
+    // Bản Resample trước làm nét cuối mất 2/3 số điểm; test này bắt lỗi đó.
+    // ------------------------------------------------------------------
+
+    private static List<Point> MakeTomatoSlice(int[] segmentOrder)
+    {
+        var pts = MakeCircle(100, 100, 80, 70, strokeId: 0);
+        int stroke = 1;
+        foreach (int k in segmentOrder)
+        {
+            double a = 2 * Math.PI * k / 6;
+            pts.AddRange(MakeCircle(
+                100 + 35 * (float)Math.Cos(a), 100 + 35 * (float)Math.Sin(a),
+                14, 14, strokeId: stroke++));
+        }
+        return pts;
+    }
+
+    [Test]
+    public void MultiStroke_EveryStrokeKeepsEnoughPoints()
+    {
+        var raw = MakeTomatoSlice(new[] { 0, 1, 2, 3, 4, 5 });
+        var resampled = PointCloud.Resample(raw, PointCloud.SamplingCount);
+
+        Assert.AreEqual(PointCloud.SamplingCount, resampled.Length);
+
+        // Mỗi nét phải còn ít nhất 2 điểm. Bản Resample cũ cắt đuôi nên
+        // nét cuối chỉ còn 1 điểm (mất 2/3), làm lệch cả đám mây.
+        var perStroke = new Dictionary<int, int>();
+        foreach (var p in resampled)
+        {
+            int c;
+            perStroke.TryGetValue(p.StrokeID, out c);
+            perStroke[p.StrokeID] = c + 1;
+        }
+
+        Assert.AreEqual(7, perStroke.Count, "Phải còn đủ 7 nét sau khi resample");
+        foreach (var kv in perStroke)
+            Assert.GreaterOrEqual(kv.Value, 2, $"Nét {kv.Key} chỉ còn {kv.Value} điểm");
+    }
+
+    [Test]
+    public void MultiStroke_OrderDoesNotMatter()
+    {
+        var a = new PointCloud("tomato", MakeTomatoSlice(new[] { 0, 1, 2, 3, 4, 5 }));
+        var b = new PointCloud("tomato", MakeTomatoSlice(new[] { 3, 0, 5, 2, 1, 4 }));
+
+        float d = _recognizer.Match(a, b);
+
+        Assert.Less(d, 0.01f, $"Vẽ múi theo thứ tự khác phải cho cùng kết quả. Khoảng cách: {d}");
+    }
+
+    // ------------------------------------------------------------------
     // TEST 6 — MatchScore trả về giá trị trong [0, 1]
     // ------------------------------------------------------------------
 

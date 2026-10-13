@@ -1,0 +1,229 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b8fbba6dac0f0248a344117542db40f, type: 3}
+  m_Name: template_triangle
+  m_EditorClassIdentifier: 
+  ingredientId: triangle
+  displayName: Triangle
+  shapeType: 4
+  maxDistance: 0.12
+  rawPoints:
+  - X: 207
+    Y: 332
+    StrokeID: 0
+    ColorID: 0
+  - X: 208
+    Y: 329
+    StrokeID: 0
+    ColorID: 0
+  - X: 207
+    Y: 327
+    StrokeID: 0
+    ColorID: 0
+  - X: 199
+    Y: 313
+    StrokeID: 0
+    ColorID: 0
+  - X: 190
+    Y: 296
+    StrokeID: 0
+    ColorID: 0
+  - X: 186
+    Y: 285
+    StrokeID: 0
+    ColorID: 0
+  - X: 177
+    Y: 269
+    StrokeID: 0
+    ColorID: 0
+  - X: 168
+    Y: 247
+    StrokeID: 0
+    ColorID: 0
+  - X: 158
+    Y: 227
+    StrokeID: 0
+    ColorID: 0
+  - X: 147
+    Y: 206
+    StrokeID: 0
+    ColorID: 0
+  - X: 136
+    Y: 188
+    StrokeID: 0
+    ColorID: 0
+  - X: 127
+    Y: 171
+    StrokeID: 0
+    ColorID: 0
+  - X: 124
+    Y: 161
+    StrokeID: 0
+    ColorID: 0
+  - X: 121
+    Y: 158
+    StrokeID: 0
+    ColorID: 0
+  - X: 119
+    Y: 151
+    StrokeID: 0
+    ColorID: 0
+  - X: 116
+    Y: 144
+    StrokeID: 0
+    ColorID: 0
+  - X: 115
+    Y: 141
+    StrokeID: 0
+    ColorID: 0
+  - X: 118
+    Y: 141
+    StrokeID: 0
+    ColorID: 0
+  - X: 123
+    Y: 141
+    StrokeID: 0
+    ColorID: 0
+  - X: 153
+    Y: 137
+    StrokeID: 0
+    ColorID: 0
+  - X: 175
+    Y: 136
+    StrokeID: 0
+    ColorID: 0
+  - X: 192
+    Y: 136
+    StrokeID: 0
+    ColorID: 0
+  - X: 207
+    Y: 136
+    StrokeID: 0
+    ColorID: 0
+  - X: 223
+    Y: 136
+    StrokeID: 0
+    ColorID: 0
+  - X: 247
+    Y: 137
+    StrokeID: 0
+    ColorID: 0
+  - X: 257
+    Y: 139
+    StrokeID: 0
+    ColorID: 0
+  - X: 281
+    Y: 139
+    StrokeID: 0
+    ColorID: 0
+  - X: 291
+    Y: 139
+    StrokeID: 0
+    ColorID: 0
+  - X: 294
+    Y: 139
+    StrokeID: 0
+    ColorID: 0
+  - X: 298
+    Y: 139
+    StrokeID: 0
+    ColorID: 0
+  - X: 305
+    Y: 140
+    StrokeID: 0
+    ColorID: 0
+  - X: 310
+    Y: 142
+    StrokeID: 0
+    ColorID: 0
+  - X: 313
+    Y: 142
+    StrokeID: 0
+    ColorID: 0
+  - X: 314
+    Y: 144
+    StrokeID: 0
+    ColorID: 0
+  - X: 314
+    Y: 147
+    StrokeID: 0
+    ColorID: 0
+  - X: 310
+    Y: 163
+    StrokeID: 0
+    ColorID: 0
+  - X: 303
+    Y: 179
+    StrokeID: 0
+    ColorID: 0
+  - X: 292
+    Y: 200
+    StrokeID: 0
+    ColorID: 0
+  - X: 274
+    Y: 224
+    StrokeID: 0
+    ColorID: 0
+  - X: 262
+    Y: 243
+    StrokeID: 0
+    ColorID: 0
+  - X: 257
+    Y: 253
+    StrokeID: 0
+    ColorID: 0
+  - X: 252
+    Y: 264
+    StrokeID: 0
+    ColorID: 0
+  - X: 246
+    Y: 273
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 281
+    StrokeID: 0
+    ColorID: 0
+  - X: 233
+    Y: 292
+    StrokeID: 0
+    ColorID: 0
+  - X: 224
+    Y: 306
+    StrokeID: 0
+    ColorID: 0
+  - X: 220
+    Y: 312
+    StrokeID: 0
+    ColorID: 0
+  - X: 216
+    Y: 317
+    StrokeID: 0
+    ColorID: 0
+  - X: 214
+    Y: 322
+    StrokeID: 0
+    ColorID: 0
+  - X: 212
+    Y: 326
+    StrokeID: 0
+    ColorID: 0
+  - X: 211
+    Y: 328
+    StrokeID: 0
+    ColorID: 0
+  - X: 211
+    Y: 331
+    StrokeID: 0
+    ColorID: 0
+  strokeCount: 1
+  notes: 

@@ -1,0 +1,333 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b8fbba6dac0f0248a344117542db40f, type: 3}
+  m_Name: template_mushroom
+  m_EditorClassIdentifier: 
+  ingredientId: mushroom
+  displayName: Mushroom
+  shapeType: 6
+  maxDistance: 0.086
+  rawPoints:
+  - X: 167
+    Y: 211
+    StrokeID: 0
+    ColorID: 0
+  - X: 168
+    Y: 208
+    StrokeID: 0
+    ColorID: 0
+  - X: 172
+    Y: 196
+    StrokeID: 0
+    ColorID: 0
+  - X: 175
+    Y: 182
+    StrokeID: 0
+    ColorID: 0
+  - X: 177
+    Y: 169
+    StrokeID: 0
+    ColorID: 0
+  - X: 178
+    Y: 158
+    StrokeID: 0
+    ColorID: 0
+  - X: 179
+    Y: 145
+    StrokeID: 0
+    ColorID: 0
+  - X: 180
+    Y: 134
+    StrokeID: 0
+    ColorID: 0
+  - X: 182
+    Y: 127
+    StrokeID: 0
+    ColorID: 0
+  - X: 184
+    Y: 122
+    StrokeID: 0
+    ColorID: 0
+  - X: 186
+    Y: 118
+    StrokeID: 0
+    ColorID: 0
+  - X: 188
+    Y: 115
+    StrokeID: 0
+    ColorID: 0
+  - X: 191
+    Y: 114
+    StrokeID: 0
+    ColorID: 0
+  - X: 196
+    Y: 111
+    StrokeID: 0
+    ColorID: 0
+  - X: 202
+    Y: 110
+    StrokeID: 0
+    ColorID: 0
+  - X: 208
+    Y: 109
+    StrokeID: 0
+    ColorID: 0
+  - X: 215
+    Y: 109
+    StrokeID: 0
+    ColorID: 0
+  - X: 221
+    Y: 110
+    StrokeID: 0
+    ColorID: 0
+  - X: 227
+    Y: 112
+    StrokeID: 0
+    ColorID: 0
+  - X: 232
+    Y: 114
+    StrokeID: 0
+    ColorID: 0
+  - X: 235
+    Y: 116
+    StrokeID: 0
+    ColorID: 0
+  - X: 237
+    Y: 118
+    StrokeID: 0
+    ColorID: 0
+  - X: 239
+    Y: 122
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 128
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 137
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 145
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 151
+    StrokeID: 0
+    ColorID: 0
+  - X: 241
+    Y: 158
+    StrokeID: 0
+    ColorID: 0
+  - X: 241
+    Y: 165
+    StrokeID: 0
+    ColorID: 0
+  - X: 241
+    Y: 172
+    StrokeID: 0
+    ColorID: 0
+  - X: 241
+    Y: 179
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 186
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 193
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 198
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 202
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 206
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 209
+    StrokeID: 0
+    ColorID: 0
+  - X: 242
+    Y: 210
+    StrokeID: 0
+    ColorID: 0
+  - X: 250
+    Y: 210
+    StrokeID: 0
+    ColorID: 0
+  - X: 261
+    Y: 212
+    StrokeID: 0
+    ColorID: 0
+  - X: 272
+    Y: 215
+    StrokeID: 0
+    ColorID: 0
+  - X: 280
+    Y: 218
+    StrokeID: 0
+    ColorID: 0
+  - X: 288
+    Y: 226
+    StrokeID: 0
+    ColorID: 0
+  - X: 295
+    Y: 238
+    StrokeID: 0
+    ColorID: 0
+  - X: 297
+    Y: 250
+    StrokeID: 0
+    ColorID: 0
+  - X: 298
+    Y: 261
+    StrokeID: 0
+    ColorID: 0
+  - X: 296
+    Y: 274
+    StrokeID: 0
+    ColorID: 0
+  - X: 294
+    Y: 282
+    StrokeID: 0
+    ColorID: 0
+  - X: 289
+    Y: 290
+    StrokeID: 0
+    ColorID: 0
+  - X: 282
+    Y: 297
+    StrokeID: 0
+    ColorID: 0
+  - X: 275
+    Y: 301
+    StrokeID: 0
+    ColorID: 0
+  - X: 263
+    Y: 306
+    StrokeID: 0
+    ColorID: 0
+  - X: 250
+    Y: 309
+    StrokeID: 0
+    ColorID: 0
+  - X: 235
+    Y: 310
+    StrokeID: 0
+    ColorID: 0
+  - X: 220
+    Y: 309
+    StrokeID: 0
+    ColorID: 0
+  - X: 204
+    Y: 308
+    StrokeID: 0
+    ColorID: 0
+  - X: 189
+    Y: 307
+    StrokeID: 0
+    ColorID: 0
+  - X: 177
+    Y: 304
+    StrokeID: 0
+    ColorID: 0
+  - X: 165
+    Y: 300
+    StrokeID: 0
+    ColorID: 0
+  - X: 153
+    Y: 294
+    StrokeID: 0
+    ColorID: 0
+  - X: 142
+    Y: 283
+    StrokeID: 0
+    ColorID: 0
+  - X: 135
+    Y: 274
+    StrokeID: 0
+    ColorID: 0
+  - X: 130
+    Y: 263
+    StrokeID: 0
+    ColorID: 0
+  - X: 127
+    Y: 253
+    StrokeID: 0
+    ColorID: 0
+  - X: 126
+    Y: 243
+    StrokeID: 0
+    ColorID: 0
+  - X: 127
+    Y: 235
+    StrokeID: 0
+    ColorID: 0
+  - X: 129
+    Y: 227
+    StrokeID: 0
+    ColorID: 0
+  - X: 133
+    Y: 222
+    StrokeID: 0
+    ColorID: 0
+  - X: 138
+    Y: 218
+    StrokeID: 0
+    ColorID: 0
+  - X: 143
+    Y: 215
+    StrokeID: 0
+    ColorID: 0
+  - X: 146
+    Y: 213
+    StrokeID: 0
+    ColorID: 0
+  - X: 150
+    Y: 213
+    StrokeID: 0
+    ColorID: 0
+  - X: 154
+    Y: 213
+    StrokeID: 0
+    ColorID: 0
+  - X: 158
+    Y: 214
+    StrokeID: 0
+    ColorID: 0
+  - X: 161
+    Y: 214
+    StrokeID: 0
+    ColorID: 0
+  - X: 165
+    Y: 215
+    StrokeID: 0
+    ColorID: 0
+  - X: 167
+    Y: 213
+    StrokeID: 0
+    ColorID: 0
+  - X: 168
+    Y: 211
+    StrokeID: 0
+    ColorID: 0
+  strokeCount: 1
+  notes: 

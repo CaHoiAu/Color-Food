@@ -1,0 +1,297 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b8fbba6dac0f0248a344117542db40f, type: 3}
+  m_Name: template_rectangle
+  m_EditorClassIdentifier: 
+  ingredientId: rectangle
+  displayName: Rectangle
+  shapeType: 3
+  maxDistance: 0.23
+  rawPoints:
+  - X: 115
+    Y: 275
+    StrokeID: 0
+    ColorID: 0
+  - X: 117
+    Y: 272
+    StrokeID: 0
+    ColorID: 0
+  - X: 117
+    Y: 269
+    StrokeID: 0
+    ColorID: 0
+  - X: 117
+    Y: 265
+    StrokeID: 0
+    ColorID: 0
+  - X: 118
+    Y: 252
+    StrokeID: 0
+    ColorID: 0
+  - X: 118
+    Y: 238
+    StrokeID: 0
+    ColorID: 0
+  - X: 118
+    Y: 222
+    StrokeID: 0
+    ColorID: 0
+  - X: 115
+    Y: 205
+    StrokeID: 0
+    ColorID: 0
+  - X: 113
+    Y: 183
+    StrokeID: 0
+    ColorID: 0
+  - X: 112
+    Y: 169
+    StrokeID: 0
+    ColorID: 0
+  - X: 112
+    Y: 160
+    StrokeID: 0
+    ColorID: 0
+  - X: 113
+    Y: 143
+    StrokeID: 0
+    ColorID: 0
+  - X: 115
+    Y: 136
+    StrokeID: 0
+    ColorID: 0
+  - X: 115
+    Y: 131
+    StrokeID: 0
+    ColorID: 0
+  - X: 115
+    Y: 131
+    StrokeID: 1
+    ColorID: 0
+  - X: 121
+    Y: 132
+    StrokeID: 1
+    ColorID: 0
+  - X: 124
+    Y: 132
+    StrokeID: 1
+    ColorID: 0
+  - X: 140
+    Y: 131
+    StrokeID: 1
+    ColorID: 0
+  - X: 153
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 161
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 172
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 188
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 200
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 214
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 231
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 249
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 261
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 270
+    Y: 130
+    StrokeID: 1
+    ColorID: 0
+  - X: 282
+    Y: 131
+    StrokeID: 1
+    ColorID: 0
+  - X: 296
+    Y: 134
+    StrokeID: 1
+    ColorID: 0
+  - X: 303
+    Y: 135
+    StrokeID: 1
+    ColorID: 0
+  - X: 314
+    Y: 137
+    StrokeID: 1
+    ColorID: 0
+  - X: 319
+    Y: 139
+    StrokeID: 1
+    ColorID: 0
+  - X: 321
+    Y: 140
+    StrokeID: 1
+    ColorID: 0
+  - X: 321
+    Y: 142
+    StrokeID: 2
+    ColorID: 0
+  - X: 320
+    Y: 144
+    StrokeID: 2
+    ColorID: 0
+  - X: 320
+    Y: 148
+    StrokeID: 2
+    ColorID: 0
+  - X: 318
+    Y: 155
+    StrokeID: 2
+    ColorID: 0
+  - X: 317
+    Y: 169
+    StrokeID: 2
+    ColorID: 0
+  - X: 317
+    Y: 197
+    StrokeID: 2
+    ColorID: 0
+  - X: 317
+    Y: 218
+    StrokeID: 2
+    ColorID: 0
+  - X: 317
+    Y: 241
+    StrokeID: 2
+    ColorID: 0
+  - X: 317
+    Y: 262
+    StrokeID: 2
+    ColorID: 0
+  - X: 315
+    Y: 272
+    StrokeID: 2
+    ColorID: 0
+  - X: 315
+    Y: 275
+    StrokeID: 2
+    ColorID: 0
+  - X: 315
+    Y: 283
+    StrokeID: 2
+    ColorID: 0
+  - X: 314
+    Y: 285
+    StrokeID: 2
+    ColorID: 0
+  - X: 117
+    Y: 275
+    StrokeID: 3
+    ColorID: 0
+  - X: 120
+    Y: 276
+    StrokeID: 3
+    ColorID: 0
+  - X: 123
+    Y: 276
+    StrokeID: 3
+    ColorID: 0
+  - X: 134
+    Y: 276
+    StrokeID: 3
+    ColorID: 0
+  - X: 147
+    Y: 278
+    StrokeID: 3
+    ColorID: 0
+  - X: 164
+    Y: 278
+    StrokeID: 3
+    ColorID: 0
+  - X: 181
+    Y: 278
+    StrokeID: 3
+    ColorID: 0
+  - X: 189
+    Y: 280
+    StrokeID: 3
+    ColorID: 0
+  - X: 199
+    Y: 283
+    StrokeID: 3
+    ColorID: 0
+  - X: 211
+    Y: 285
+    StrokeID: 3
+    ColorID: 0
+  - X: 221
+    Y: 286
+    StrokeID: 3
+    ColorID: 0
+  - X: 232
+    Y: 285
+    StrokeID: 3
+    ColorID: 0
+  - X: 243
+    Y: 284
+    StrokeID: 3
+    ColorID: 0
+  - X: 258
+    Y: 281
+    StrokeID: 3
+    ColorID: 0
+  - X: 267
+    Y: 280
+    StrokeID: 3
+    ColorID: 0
+  - X: 277
+    Y: 280
+    StrokeID: 3
+    ColorID: 0
+  - X: 285
+    Y: 280
+    StrokeID: 3
+    ColorID: 0
+  - X: 296
+    Y: 280
+    StrokeID: 3
+    ColorID: 0
+  - X: 307
+    Y: 278
+    StrokeID: 3
+    ColorID: 0
+  - X: 313
+    Y: 276
+    StrokeID: 3
+    ColorID: 0
+  - X: 316
+    Y: 276
+    StrokeID: 3
+    ColorID: 0
+  - X: 318
+    Y: 278
+    StrokeID: 3
+    ColorID: 0
+  strokeCount: 4
+  notes: 

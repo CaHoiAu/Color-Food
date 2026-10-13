@@ -251,8 +251,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   canvas: {fileID: 1199532455}
+  templateAssets:
+  - {fileID: 11400000, guid: b68ebfb2ae783c146be5624ce11098f7, type: 2}
+  - {fileID: 11400000, guid: 09318bae68e7054478658e62791ede37, type: 2}
+  - {fileID: 11400000, guid: faf140f17d9aec34d8223d2cde3561fc, type: 2}
   maxDistance: 0.09
   passThreshold: 0.7
+  csvFileName: calibration.csv
+  clearAfterRecord: 1
 --- !u!4 &360622517
 Transform:
   m_ObjectHideFlags: 0
