@@ -230,6 +230,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 360622517}
+  - component: {fileID: 360622518}
   - component: {fileID: 360622516}
   m_Layer: 0
   m_Name: GameObject
@@ -245,7 +246,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 360622515}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: a30f4692e51e0bc4f8b364a966bc5ea3, type: 3}
   m_Name: 
@@ -255,6 +256,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b68ebfb2ae783c146be5624ce11098f7, type: 2}
   - {fileID: 11400000, guid: 09318bae68e7054478658e62791ede37, type: 2}
   - {fileID: 11400000, guid: faf140f17d9aec34d8223d2cde3561fc, type: 2}
+  - {fileID: 11400000, guid: 085eca96f6132e7489165f964c40c201, type: 2}
   maxDistance: 0.09
   passThreshold: 0.7
   csvFileName: calibration.csv
@@ -274,6 +276,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &360622518
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 360622515}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 02db74283f30c94459dec23b47f5d2c5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  canvas: {fileID: 1199532455}
+  palette: {fileID: 0}
+  ingredients:
+  - {fileID: 11400000, guid: 085eca96f6132e7489165f964c40c201, type: 2}
+  passThreshold: 0.7
+  csvFileName: scoring_log.csv
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -609,6 +629,9 @@ MonoBehaviour:
   brushColor: {r: 0, g: 0, b: 0, a: 1}
   brushRadius: 4
   minPointDistance: 3
+  palette: {fileID: 11400000, guid: 35bc023e022073a4ea46f7c939d7134b, type: 2}
+  closeGapPixels: 25
+  minRegionArea: 40
   logOnEvaluate: 1
 --- !u!114 &1199532456
 MonoBehaviour:

@@ -1,0 +1,492 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b8fbba6dac0f0248a344117542db40f, type: 3}
+  m_Name: template_egg
+  m_EditorClassIdentifier: 
+  ingredientId: egg
+  displayName: Egg
+  shapeType: 2
+  maxDistance: 0.12
+  rawPoints:
+  - X: 235
+    Y: 283
+    StrokeID: 0
+    ColorID: 0
+  - X: 230
+    Y: 286
+    StrokeID: 0
+    ColorID: 0
+  - X: 229
+    Y: 288
+    StrokeID: 0
+    ColorID: 0
+  - X: 227
+    Y: 289
+    StrokeID: 0
+    ColorID: 0
+  - X: 214
+    Y: 294
+    StrokeID: 0
+    ColorID: 0
+  - X: 195
+    Y: 294
+    StrokeID: 0
+    ColorID: 0
+  - X: 182
+    Y: 291
+    StrokeID: 0
+    ColorID: 0
+  - X: 171
+    Y: 287
+    StrokeID: 0
+    ColorID: 0
+  - X: 160
+    Y: 280
+    StrokeID: 0
+    ColorID: 0
+  - X: 148
+    Y: 270
+    StrokeID: 0
+    ColorID: 0
+  - X: 139
+    Y: 264
+    StrokeID: 0
+    ColorID: 0
+  - X: 126
+    Y: 255
+    StrokeID: 0
+    ColorID: 0
+  - X: 116
+    Y: 248
+    StrokeID: 0
+    ColorID: 0
+  - X: 102
+    Y: 240
+    StrokeID: 0
+    ColorID: 0
+  - X: 88
+    Y: 235
+    StrokeID: 0
+    ColorID: 0
+  - X: 72
+    Y: 225
+    StrokeID: 0
+    ColorID: 0
+  - X: 60
+    Y: 214
+    StrokeID: 0
+    ColorID: 0
+  - X: 50
+    Y: 201
+    StrokeID: 0
+    ColorID: 0
+  - X: 42
+    Y: 188
+    StrokeID: 0
+    ColorID: 0
+  - X: 38
+    Y: 175
+    StrokeID: 0
+    ColorID: 0
+  - X: 37
+    Y: 163
+    StrokeID: 0
+    ColorID: 0
+  - X: 37
+    Y: 150
+    StrokeID: 0
+    ColorID: 0
+  - X: 40
+    Y: 141
+    StrokeID: 0
+    ColorID: 0
+  - X: 45
+    Y: 132
+    StrokeID: 0
+    ColorID: 0
+  - X: 51
+    Y: 123
+    StrokeID: 0
+    ColorID: 0
+  - X: 57
+    Y: 114
+    StrokeID: 0
+    ColorID: 0
+  - X: 67
+    Y: 105
+    StrokeID: 0
+    ColorID: 0
+  - X: 83
+    Y: 98
+    StrokeID: 0
+    ColorID: 0
+  - X: 100
+    Y: 93
+    StrokeID: 0
+    ColorID: 0
+  - X: 123
+    Y: 90
+    StrokeID: 0
+    ColorID: 0
+  - X: 144
+    Y: 88
+    StrokeID: 0
+    ColorID: 0
+  - X: 161
+    Y: 87
+    StrokeID: 0
+    ColorID: 0
+  - X: 183
+    Y: 88
+    StrokeID: 0
+    ColorID: 0
+  - X: 204
+    Y: 89
+    StrokeID: 0
+    ColorID: 0
+  - X: 225
+    Y: 90
+    StrokeID: 0
+    ColorID: 0
+  - X: 243
+    Y: 89
+    StrokeID: 0
+    ColorID: 0
+  - X: 262
+    Y: 90
+    StrokeID: 0
+    ColorID: 0
+  - X: 281
+    Y: 91
+    StrokeID: 0
+    ColorID: 0
+  - X: 298
+    Y: 92
+    StrokeID: 0
+    ColorID: 0
+  - X: 316
+    Y: 96
+    StrokeID: 0
+    ColorID: 0
+  - X: 333
+    Y: 100
+    StrokeID: 0
+    ColorID: 0
+  - X: 351
+    Y: 107
+    StrokeID: 0
+    ColorID: 0
+  - X: 369
+    Y: 115
+    StrokeID: 0
+    ColorID: 0
+  - X: 383
+    Y: 123
+    StrokeID: 0
+    ColorID: 0
+  - X: 392
+    Y: 132
+    StrokeID: 0
+    ColorID: 0
+  - X: 398
+    Y: 143
+    StrokeID: 0
+    ColorID: 0
+  - X: 401
+    Y: 156
+    StrokeID: 0
+    ColorID: 0
+  - X: 401
+    Y: 168
+    StrokeID: 0
+    ColorID: 0
+  - X: 399
+    Y: 183
+    StrokeID: 0
+    ColorID: 0
+  - X: 397
+    Y: 193
+    StrokeID: 0
+    ColorID: 0
+  - X: 393
+    Y: 204
+    StrokeID: 0
+    ColorID: 0
+  - X: 387
+    Y: 214
+    StrokeID: 0
+    ColorID: 0
+  - X: 381
+    Y: 225
+    StrokeID: 0
+    ColorID: 0
+  - X: 373
+    Y: 236
+    StrokeID: 0
+    ColorID: 0
+  - X: 364
+    Y: 246
+    StrokeID: 0
+    ColorID: 0
+  - X: 353
+    Y: 257
+    StrokeID: 0
+    ColorID: 0
+  - X: 341
+    Y: 266
+    StrokeID: 0
+    ColorID: 0
+  - X: 330
+    Y: 273
+    StrokeID: 0
+    ColorID: 0
+  - X: 317
+    Y: 279
+    StrokeID: 0
+    ColorID: 0
+  - X: 304
+    Y: 284
+    StrokeID: 0
+    ColorID: 0
+  - X: 289
+    Y: 287
+    StrokeID: 0
+    ColorID: 0
+  - X: 276
+    Y: 290
+    StrokeID: 0
+    ColorID: 0
+  - X: 269
+    Y: 292
+    StrokeID: 0
+    ColorID: 0
+  - X: 262
+    Y: 293
+    StrokeID: 0
+    ColorID: 0
+  - X: 254
+    Y: 293
+    StrokeID: 0
+    ColorID: 0
+  - X: 249
+    Y: 293
+    StrokeID: 0
+    ColorID: 0
+  - X: 246
+    Y: 292
+    StrokeID: 0
+    ColorID: 0
+  - X: 242
+    Y: 292
+    StrokeID: 0
+    ColorID: 0
+  - X: 238
+    Y: 292
+    StrokeID: 0
+    ColorID: 0
+  - X: 235
+    Y: 291
+    StrokeID: 0
+    ColorID: 0
+  - X: 230
+    Y: 291
+    StrokeID: 0
+    ColorID: 0
+  - X: 228
+    Y: 290
+    StrokeID: 0
+    ColorID: 0
+  - X: 225
+    Y: 290
+    StrokeID: 0
+    ColorID: 0
+  - X: 230
+    Y: 243
+    StrokeID: 1
+    ColorID: 0
+  - X: 225
+    Y: 244
+    StrokeID: 1
+    ColorID: 0
+  - X: 223
+    Y: 245
+    StrokeID: 1
+    ColorID: 0
+  - X: 221
+    Y: 246
+    StrokeID: 1
+    ColorID: 0
+  - X: 210
+    Y: 249
+    StrokeID: 1
+    ColorID: 0
+  - X: 198
+    Y: 249
+    StrokeID: 1
+    ColorID: 0
+  - X: 183
+    Y: 244
+    StrokeID: 1
+    ColorID: 0
+  - X: 173
+    Y: 238
+    StrokeID: 1
+    ColorID: 0
+  - X: 165
+    Y: 230
+    StrokeID: 1
+    ColorID: 0
+  - X: 161
+    Y: 224
+    StrokeID: 1
+    ColorID: 0
+  - X: 159
+    Y: 216
+    StrokeID: 1
+    ColorID: 0
+  - X: 158
+    Y: 207
+    StrokeID: 1
+    ColorID: 0
+  - X: 159
+    Y: 199
+    StrokeID: 1
+    ColorID: 0
+  - X: 161
+    Y: 192
+    StrokeID: 1
+    ColorID: 0
+  - X: 165
+    Y: 185
+    StrokeID: 1
+    ColorID: 0
+  - X: 170
+    Y: 178
+    StrokeID: 1
+    ColorID: 0
+  - X: 176
+    Y: 173
+    StrokeID: 1
+    ColorID: 0
+  - X: 183
+    Y: 169
+    StrokeID: 1
+    ColorID: 0
+  - X: 191
+    Y: 166
+    StrokeID: 1
+    ColorID: 0
+  - X: 204
+    Y: 164
+    StrokeID: 1
+    ColorID: 0
+  - X: 215
+    Y: 164
+    StrokeID: 1
+    ColorID: 0
+  - X: 222
+    Y: 164
+    StrokeID: 1
+    ColorID: 0
+  - X: 231
+    Y: 166
+    StrokeID: 1
+    ColorID: 0
+  - X: 238
+    Y: 170
+    StrokeID: 1
+    ColorID: 0
+  - X: 244
+    Y: 174
+    StrokeID: 1
+    ColorID: 0
+  - X: 250
+    Y: 181
+    StrokeID: 1
+    ColorID: 0
+  - X: 254
+    Y: 189
+    StrokeID: 1
+    ColorID: 0
+  - X: 255
+    Y: 198
+    StrokeID: 1
+    ColorID: 0
+  - X: 255
+    Y: 209
+    StrokeID: 1
+    ColorID: 0
+  - X: 254
+    Y: 218
+    StrokeID: 1
+    ColorID: 0
+  - X: 251
+    Y: 225
+    StrokeID: 1
+    ColorID: 0
+  - X: 248
+    Y: 232
+    StrokeID: 1
+    ColorID: 0
+  - X: 245
+    Y: 236
+    StrokeID: 1
+    ColorID: 0
+  - X: 243
+    Y: 239
+    StrokeID: 1
+    ColorID: 0
+  - X: 239
+    Y: 242
+    StrokeID: 1
+    ColorID: 0
+  - X: 236
+    Y: 244
+    StrokeID: 1
+    ColorID: 0
+  - X: 234
+    Y: 245
+    StrokeID: 1
+    ColorID: 0
+  - X: 229
+    Y: 245
+    StrokeID: 1
+    ColorID: 0
+  - X: 227
+    Y: 244
+    StrokeID: 1
+    ColorID: 0
+  strokeCount: 2
+  shapeWeight: 0.4
+  missingPartCap: 0.5
+  parts:
+  - name: white
+    role: 0
+    minCount: 1
+    maxCount: 1
+    areaRatioMin: 0
+    areaRatioMax: 0
+    targetColors:
+    - white
+    - cream
+    weight: 0.2
+  - name: yolk
+    role: 1
+    minCount: 1
+    maxCount: 1
+    areaRatioMin: 0.05
+    areaRatioMax: 0.25
+    targetColors:
+    - yellow
+    - orange
+    weight: 0.4
+  notes: 

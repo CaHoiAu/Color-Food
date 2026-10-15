@@ -38,6 +38,18 @@ namespace ColorFood.Data
         public Point[] rawPoints = new Point[0];
         public int strokeCount;
 
+        [Header("Bộ phận và màu (bước 4)")]
+        [Tooltip("Trọng số của điểm hình ($P) so với tổng trọng số các bộ phận.")]
+        [Range(0f, 1f)] public float shapeWeight = 0.4f;
+
+        [Tooltip("Thiếu bộ phận bắt buộc thì điểm tổng không vượt quá giá trị này " +
+                 "(nên dưới ngưỡng đạt 0.7).")]
+        [Range(0f, 1f)] public float missingPartCap = 0.5f;
+
+        [Tooltip("Luật từng bộ phận: số lượng, diện tích, màu. Để trống = chỉ chấm hình. " +
+                 "Có thể điền nhanh bằng menu Color Food → Presets.")]
+        public PartRule[] parts = new PartRule[0];
+
         [TextArea]
         public string notes;
 

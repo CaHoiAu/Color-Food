@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 81e4cf6818e9d0b42bfe844fc0485837, type: 3}
+  m_Name: palette_default
+  m_EditorClassIdentifier: 
+  entries:
+  - name: white
+    color:
+      serializedVersion: 2
+      rgba: 4294967295
+  - name: cream
+    color:
+      serializedVersion: 2
+      rgba: 4291685365
+  - name: grey
+    color:
+      serializedVersion: 2
+      rgba: 4288059030
+  - name: brown
+    color:
+      serializedVersion: 2
+      rgba: 4280829550
+  - name: tan
+    color:
+      serializedVersion: 2
+      rgba: 4286098130
+  - name: red
+    color:
+      serializedVersion: 2
+      rgba: 4280821980
+  - name: dark red
+    color:
+      serializedVersion: 2
+      rgba: 4279833740
+  - name: pink
+    color:
+      serializedVersion: 2
+      rgba: 4289372405
+  - name: orange
+    color:
+      serializedVersion: 2
+      rgba: 4280192240
+  - name: yellow
+    color:
+      serializedVersion: 2
+      rgba: 4280866810
+  - name: pale yellow
+    color:
+      serializedVersion: 2
+      rgba: 4288737530
+  - name: green
+    color:
+      serializedVersion: 2
+      rgba: 4282165830
+  - name: dark green
+    color:
+      serializedVersion: 2
+      rgba: 4280837150
+  - name: light green
+    color:
+      serializedVersion: 2
+      rgba: 4285455530
+  - name: purple
+    color:
+      serializedVersion: 2
+      rgba: 4288035960
+  - name: blue
+    color:
+      serializedVersion: 2
+      rgba: 4291325500
+  tolerance: 0.25
