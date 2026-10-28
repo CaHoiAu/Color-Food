@@ -16,6 +16,30 @@ namespace ColorFood.Recognition
             float score = 1f - (d / maxDistance);
             return score < 0f ? 0f : (score > 1f ? 1f : score);
         }
+        public float MatchBest(PointCloud drawn, IReadOnlyList<PointCloud> templates, out int bestIndex)
+        {
+            bestIndex = -1;
+            float best = float.MaxValue;
+            if (templates == null) return best;
+
+            for (int i = 0; i < templates.Count; i++)
+            {
+                if (templates[i] == null) continue;
+                float d = Match(drawn, templates[i]);
+                if (d < best) { best = d; bestIndex = i; }
+            }
+            return best;
+        }
+
+        /// <summary>Điểm 0..1 theo mẫu giống nhất trong danh sách (xem MatchBest).</summary>
+        public float MatchBestScore(PointCloud drawn, IReadOnlyList<PointCloud> templates,
+                                    float maxDistance, out int bestIndex)
+        {
+            float d = MatchBest(drawn, templates, out bestIndex);
+            if (bestIndex < 0) return 0f;
+            float score = 1f - (d / maxDistance);
+            return score < 0f ? 0f : (score > 1f ? 1f : score);
+        }
         public (string name, float score) Classify(
             PointCloud drawn, IEnumerable<PointCloud> templates, float maxDistance = 0.09f)
         {

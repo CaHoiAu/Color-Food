@@ -354,9 +354,8 @@ namespace ColorFood.Drawing
             PointCloud cloud = BuildPointCloud();
             if (cloud == null) return null;
 
-            PointCloud templateCloud = template.GetCloud();
-            distance = recognizer.Match(cloud, templateCloud);
-            float shape = recognizer.MatchScore(cloud, templateCloud, template.maxDistance);
+            float shape = recognizer.MatchBestScore(cloud, template.GetClouds(), template.maxDistance, out int best);
+            distance = recognizer.Match(cloud, template.GetClouds()[best]);
 
             return IngredientScorer.Score(shape, AnalyzeRegions(), _fill, palette.Table,
                                           template.shapeWeight, template.parts,

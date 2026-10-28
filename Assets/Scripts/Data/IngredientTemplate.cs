@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using ColorFood.Recognition;
 
@@ -10,6 +11,20 @@ namespace ColorFood.Data
     public enum ShapeType { Circle, Ellipse, Blob, Rectangle, Triangle, Strip, Other }
 
     /// <summary>
+    /// Một nét vẽ mẫu PHỤ của nguyên liệu (cách vẽ khác: nhìn nghiêng, cắt
+    /// lát, số nét khác…). Điểm thô, cùng hệ tọa độ với rawPoints.
+    /// </summary>
+    [System.Serializable]
+    public class TemplateVariant
+    {
+        public string label = "";
+        public Point[] rawPoints = new Point[0];
+        public int strokeCount;
+
+        public bool IsValid => rawPoints != null && rawPoints.Length >= 2;
+    }
+
+    /// <summary>
     /// Template của một nguyên liệu: nét vẽ mẫu + dung sai chấm điểm.
     ///
     /// Đây là DỮ LIỆU, không phải code — thêm nguyên liệu mới chỉ cần tạo
@@ -19,6 +34,12 @@ namespace ColorFood.Data
     /// này đổi SamplingCount hoặc cách chuẩn hóa thì không phải vẽ lại mẫu.
     ///
     /// Tọa độ: gốc dưới-trái, trục Y hướng LÊN — cùng hệ với DrawingCanvas.
+    ///
+    /// NHIỀU MẪU: một nguyên liệu có thể có nhiều cách vẽ. Mẫu 1 là
+    /// rawPoints (giữ nguyên tên trường để asset cũ không phải sửa), các mẫu
+    /// tiếp theo nằm trong extraVariants. Khi chấm điểm, nét vẽ được so với
+    /// TẤT CẢ mẫu và lấy mẫu giống nhất — thêm mẫu không bao giờ làm điểm tụt.
+    /// Mọi mẫu dùng chung maxDistance và luật bộ phận.
     /// </summary>
     [CreateAssetMenu(menuName = "Color Food/Ingredient Template", fileName = "template_new")]
     public class IngredientTemplate : ScriptableObject
@@ -35,8 +56,13 @@ namespace ColorFood.Data
         public float maxDistance = 0.12f;
 
         [Header("Nét vẽ mẫu (do Template Recorder ghi)")]
+        [Tooltip("Mẫu 1 (mẫu chính).")]
         public Point[] rawPoints = new Point[0];
         public int strokeCount;
+
+        [Tooltip("Mẫu 2, 3… — các cách vẽ khác của cùng nguyên liệu. " +
+                 "Thêm bằng Template Recorder (Lưu → Thêm mẫu mới).")]
+        public TemplateVariant[] extraVariants = new TemplateVariant[0];
 
         [Header("Bộ phận và màu (bước 4)")]
         [Tooltip("Trọng số của điểm hình ($P) so với tổng trọng số các bộ phận.")]
@@ -68,25 +94,120 @@ namespace ColorFood.Data
         [TextArea]
         public string notes;
 
-        [System.NonSerialized] private PointCloud _cloud;
+        [System.NonSerialized] private PointCloud[] _clouds;
 
-        public bool IsValid => rawPoints != null && rawPoints.Length >= 2;
+        /// <summary>Tổng số mẫu, kể cả mẫu 1 (rawPoints) — tính cả mẫu rỗng.</summary>
+        public int VariantCount => 1 + (extraVariants != null ? extraVariants.Length : 0);
 
-        /// <summary>
-        /// PointCloud đã chuẩn hóa, tính MỘT LẦN rồi cache — không chuẩn hóa
-        /// lại mỗi lần chấm điểm.
-        /// </summary>
-        public PointCloud GetCloud()
+        /// <summary>Có ít nhất một mẫu đủ điểm để chấm.</summary>
+        public bool IsValid
         {
-            if (!IsValid) return null;
-            if (_cloud == null) _cloud = new PointCloud(ingredientId, rawPoints);
-            return _cloud;
+            get
+            {
+                for (int i = 0; i < VariantCount; i++)
+                    if (IsVariantValid(i)) return true;
+                return false;
+            }
         }
 
-        /// <summary>Gọi khi rawPoints bị thay từ code (Inspector tự gọi OnValidate).</summary>
-        public void InvalidateCache() => _cloud = null;
+        public Point[] GetVariantPoints(int index)
+            => index == 0 ? rawPoints : extraVariants[index - 1].rawPoints;
 
-        private void OnEnable()   => _cloud = null;
-        private void OnValidate() => _cloud = null;
+        public int GetVariantStrokeCount(int index)
+            => index == 0 ? strokeCount : extraVariants[index - 1].strokeCount;
+
+        public string GetVariantLabel(int index)
+        {
+            string label = index == 0 ? "" : extraVariants[index - 1]?.label;
+            return string.IsNullOrEmpty(label)
+                ? "Mẫu " + (index + 1) + (index == 0 ? " (chính)" : "")
+                : "Mẫu " + (index + 1) + ": " + label;
+        }
+
+        private bool IsVariantValid(int index)
+        {
+            Point[] pts = index == 0 ? rawPoints : extraVariants[index - 1]?.rawPoints;
+            return pts != null && pts.Length >= 2;
+        }
+
+        /// <summary>
+        /// PointCloud đã chuẩn hóa của MỌI mẫu hợp lệ, tính MỘT LẦN rồi cache —
+        /// không chuẩn hóa lại mỗi lần chấm điểm. Mẫu rỗng bị bỏ qua, nên chỉ số
+        /// trong mảng này có thể khác chỉ số mẫu.
+        /// </summary>
+        public IReadOnlyList<PointCloud> GetClouds()
+        {
+            if (_clouds != null) return _clouds;
+
+            var list = new List<PointCloud>(VariantCount);
+            for (int i = 0; i < VariantCount; i++)
+                if (IsVariantValid(i))
+                    list.Add(new PointCloud(ingredientId + "#" + (i + 1), GetVariantPoints(i)));
+            _clouds = list.ToArray();
+            return _clouds;
+        }
+
+        /// <summary>PointCloud của mẫu hợp lệ đầu tiên (null nếu không có).</summary>
+        public PointCloud GetCloud()
+        {
+            var clouds = GetClouds();
+            return clouds.Count > 0 ? clouds[0] : null;
+        }
+
+        /// <summary>Thay nét vẽ của một mẫu có sẵn (index 0 = mẫu chính).</summary>
+        public void SetVariant(int index, Point[] points, int strokes)
+        {
+            if (index == 0) { rawPoints = points; strokeCount = strokes; }
+            else
+            {
+                extraVariants[index - 1].rawPoints = points;
+                extraVariants[index - 1].strokeCount = strokes;
+            }
+            InvalidateCache();
+        }
+
+        /// <summary>Thêm một mẫu mới, trả về chỉ số của nó. Mẫu chính còn trống thì điền vào đó.</summary>
+        public int AddVariant(Point[] points, int strokes, string label = "")
+        {
+            if (!IsVariantValid(0))
+            {
+                SetVariant(0, points, strokes);
+                return 0;
+            }
+
+            var list = new List<TemplateVariant>(extraVariants ?? new TemplateVariant[0]);
+            list.Add(new TemplateVariant { label = label, rawPoints = points, strokeCount = strokes });
+            extraVariants = list.ToArray();
+            InvalidateCache();
+            return list.Count;
+        }
+
+        /// <summary>
+        /// Xóa một mẫu. Xóa mẫu chính thì mẫu 2 được đôn lên thay; nếu chỉ còn
+        /// một mẫu thì không xóa (trả về false).
+        /// </summary>
+        public bool RemoveVariant(int index)
+        {
+            if (VariantCount <= 1 || index < 0 || index >= VariantCount) return false;
+
+            var list = new List<TemplateVariant>(extraVariants);
+            if (index == 0)
+            {
+                rawPoints = list[0].rawPoints;
+                strokeCount = list[0].strokeCount;
+                list.RemoveAt(0);
+            }
+            else list.RemoveAt(index - 1);
+
+            extraVariants = list.ToArray();
+            InvalidateCache();
+            return true;
+        }
+
+        /// <summary>Gọi khi điểm mẫu bị thay từ code (Inspector tự gọi OnValidate).</summary>
+        public void InvalidateCache() => _clouds = null;
+
+        private void OnEnable() => _clouds = null;
+        private void OnValidate() => _clouds = null;
     }
 }
