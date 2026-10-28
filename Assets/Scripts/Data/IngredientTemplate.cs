@@ -46,6 +46,21 @@ namespace ColorFood.Data
                  "(nên dưới ngưỡng đạt 0.7).")]
         [Range(0f, 1f)] public float missingPartCap = 0.5f;
 
+        [Tooltip("Hình ($P) dưới ngưỡng này thì điểm tổng cũng bị chặn, dù tô màu đúng hết. " +
+                 "Không có luật này, tô màu đúng có thể bù cho một nét vẽ sai hình rõ rệt " +
+                 "(ví dụ hình 0.42 + bộ phận hoàn hảo vẫn ra tổng ~0.77 với trọng số mặc định). " +
+                 "0 = tắt (không chặn theo hình).")]
+        [Range(0f, 1f)] public float minShape = 0.5f;
+
+        [Tooltip("Hình dưới minShape thì điểm tổng không vượt quá giá trị này.")]
+        [Range(0f, 1f)] public float shapeCap = 0.5f;
+
+        [Tooltip("Một bộ phận có minRoundness (độ tròn) mà đo được thấp hơn ngưỡng đó " +
+                 "thì điểm tổng không vượt quá giá trị này — giống cơ chế shapeCap, " +
+                 "nhưng xét độ tròn TỪNG vùng thay vì hình toàn cục ($P). Bắt đúng case " +
+                 "outline gồ ghề (méo như amip) mà $P vẫn cho hình khá cao.")]
+        [Range(0f, 1f)] public float roundnessCap = 0.5f;
+
         [Tooltip("Luật từng bộ phận: số lượng, diện tích, màu. Để trống = chỉ chấm hình. " +
                  "Có thể điền nhanh bằng menu Color Food → Presets.")]
         public PartRule[] parts = new PartRule[0];

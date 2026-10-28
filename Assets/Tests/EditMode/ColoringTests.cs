@@ -81,11 +81,90 @@ public class ColoringTests
         return Draw(all, closeGap);
     }
 
-    private ScoreResult ScoreEgg(Drawing d, float shape = 1f, float cap = 0.5f)
+    private ScoreResult ScoreEgg(Drawing d, float shape = 1f, float cap = 0.5f,
+                                 float minShape = 0.5f, float shapeCap = 0.5f)
     {
         var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
         return IngredientScorer.Score(shape, regions, d.Fill, _colors, 0.4f,
-                                      PartPresets.FriedEgg(), cap);
+                                      PartPresets.FriedEgg(), cap, minShape, shapeCap);
+    }
+
+    /// <summary>
+    /// Vòng ngoài có mấy chỗ lồi hẳn ra như amip (giống hình trứng méo nhiều gợn
+    /// người dùng vẽ thật) — bán kính dao động theo góc thay vì hằng số.
+    /// $P vẫn có thể cho điểm hình khá cao vì nó đo khoảng cách TRUNG BÌNH trên
+    /// cả đám điểm, còn circularity thì phạt trực tiếp vì chu vi tăng vọt.
+    /// </summary>
+    private static List<Point> JaggedBlob(float cx, float cy, float baseR,
+                                          float bumpAmount, int bumps, int stroke = 0, int n = 160)
+    {
+        var pts = new List<Point>();
+        for (int i = 0; i <= n; i++)
+        {
+            double a = 2 * Math.PI * i / n;
+            float r = baseR * (1f + bumpAmount * (float)Math.Sin(bumps * a));
+            pts.Add(new Point(cx + r * (float)Math.Cos(a), cy + r * (float)Math.Sin(a), stroke));
+        }
+        return pts;
+    }
+
+    private static Func<double, double> EllipseR(float rx, float ry)
+        => a => (rx * ry) / Math.Sqrt(Math.Pow(ry * Math.Cos(a), 2) + Math.Pow(rx * Math.Sin(a), 2));
+
+    private static List<Point> Polar(float cx, float cy, Func<double, double> r, int stroke = 0, int n = 360)
+    {
+        var pts = new List<Point>();
+        for (int i = 0; i <= n; i++)
+        {
+            double a = i == n ? 0.0 : 2 * Math.PI * i / n;
+            pts.Add(new Point(cx + (float)(r(a) * Math.Cos(a)), cy + (float)(r(a) * Math.Sin(a)), stroke));
+        }
+        return pts;
+    }
+
+    /// <summary>Lòng trắng trứng thật: elip bị méo bởi vài sóng thoải (không gai).</summary>
+    private static List<Point> OrganicWhite(int seed, float amp, int stroke = 0)
+    {
+        var rng = new Random(seed);
+        var ph = new double[5]; var am = new double[5];
+        for (int k = 0; k < 5; k++)
+        {
+            ph[k] = rng.NextDouble() * 2 * Math.PI;
+            am[k] = amp * (0.4 + 0.6 * rng.NextDouble()) / Math.Pow(k + 2, 0.7);
+        }
+        var e = EllipseR(170, 115);
+        return Polar(256, 256, a =>
+        {
+            double s = 0;
+            for (int k = 0; k < 5; k++) s += am[k] * Math.Sin((k + 2) * a + ph[k]);
+            return e(a) * (1 + s);
+        }, stroke);
+    }
+
+    /// <summary>Lòng trắng có GAI NHỌN: các tam giác hẹp nhô ra trên nền elip.</summary>
+    private static List<Point> SpikyWhite(int spikes, float height, float widthRad, int stroke = 0)
+    {
+        var e = EllipseR(170, 115);
+        var centers = new double[spikes];
+        for (int i = 0; i < spikes; i++) centers[i] = 2 * Math.PI * i / spikes;
+        return Polar(256, 256, a =>
+        {
+            double s = 0;
+            foreach (double c in centers)
+            {
+                double d = Math.Abs(((a - c + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI);
+                if (d < widthRad) s = Math.Max(s, height * (1 - d / widthRad));
+            }
+            return e(a) * (1 + s);
+        }, stroke);
+    }
+
+    /// <summary>Tô lòng trắng bằng cách thử vài điểm bên trái (nằm ngoài lòng đỏ); true nếu tô được.</summary>
+    private bool FillWhite(Drawing d)
+    {
+        foreach (int x in new[] { 150, 140, 130, 120, 110 })
+            if (FillAt(d, x, 256, _colors.IndexOf("white"))) return true;
+        return false;
     }
 
     // ------------------------------------------------------------------
@@ -304,6 +383,74 @@ public class ColoringTests
     }
 
     [Test]
+    public void Score_Egg_VeryBadShape_PerfectParts_IsStillCapped()
+    {
+        // Dữ liệu thật (scoring_log.csv dòng 9): hình 0.42, nếu tô đúng hết thì
+        // total cũ = 0.4*0.42 + 0.6*1.0 = 0.77 — VẪN ĐẠT dù hình rớt rõ rệt.
+        // minShape phải chặn trường hợp này lại dưới ngưỡng đạt.
+        var d = Egg(true);
+        FillAt(d, 90, 256, _colors.IndexOf("white"));
+        FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+        var r = ScoreEgg(d, shape: 0.42f);
+        TestContext.WriteLine(r.Report);
+        Assert.IsTrue(r.Capped);
+        Assert.LessOrEqual(r.Total, 0.5f);
+        Assert.Less(r.Total, 0.7f, "phải dưới ngưỡng đạt 0.7");
+    }
+
+    [Test]
+    public void Score_Egg_ShapeAboveMinShape_IsNotCappedByShape()
+    {
+        // Ngay trên ngưỡng (mặc định 0.5): không bị chặn vì hình, chỉ chặn nếu thiếu bộ phận.
+        var d = Egg(true);
+        FillAt(d, 90, 256, _colors.IndexOf("white"));
+        FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+        var r = ScoreEgg(d, shape: 0.55f);
+        TestContext.WriteLine(r.Report);
+        Assert.IsFalse(r.Capped);
+    }
+
+    [Test]
+    public void Score_Egg_MinShapeZero_DisablesShapeCap()
+    {
+        // minShape = 0 nghĩa là tắt hẳn cơ chế này (giữ hành vi cũ) — dùng được
+        // cho nguyên liệu mà hình quá khó đo (ví dụ chỉ có 1 nét ngắn).
+        var regions = RegionAnalyzer.Analyze(Egg(true).Barrier, W, H);
+        var fillIds = Egg(true).Fill;
+        var r = IngredientScorer.Score(0.42f, regions, fillIds, _colors, 0.4f,
+                                       PartPresets.FriedEgg(), 0.5f, minShape: 0f);
+        TestContext.WriteLine(r.Report);
+        Assert.IsFalse(r.Capped, "minShape=0 không được chặn gì theo hình");
+    }
+
+    [Test]
+    public void Score_NoRules_ShapeTooLow_IsStillCapped()
+    {
+        // Nguyên liệu không có luật bộ phận: total = shape luôn, nên cap chỉ có
+        // tác dụng khi shapeCap nằm GIỮA shape và minShape (shapeCap < shape < minShape) —
+        // nếu không, total vốn đã thấp hơn cap, không có gì để chặn thêm.
+        var set = RegionAnalyzer.Analyze(Egg(false).Barrier, W, H);
+        var r = IngredientScorer.Score(0.55f, set, new int[W * H], _colors, 0.4f, null, 0.5f,
+                                       minShape: 0.6f, shapeCap: 0.5f);
+        Assert.IsTrue(r.Capped);
+        Assert.AreEqual(0.5f, r.Total, 0.0001f);
+    }
+
+    [Test]
+    public void Score_NoRules_ShapeBelowShapeCap_IsNotArtificiallyRaised()
+    {
+        // Khi total vốn đã thấp hơn shapeCap, không có gì "để chặn" — total
+        // giữ nguyên giá trị thấp đó, cap không kéo điểm LÊN.
+        var set = RegionAnalyzer.Analyze(Egg(false).Barrier, W, H);
+        var r = IngredientScorer.Score(0.3f, set, new int[W * H], _colors, 0.4f, null, 0.5f,
+                                       minShape: 0.5f, shapeCap: 0.5f);
+        Assert.IsFalse(r.Capped);
+        Assert.AreEqual(0.3f, r.Total, 0.0001f);
+    }
+
+    [Test]
     public void Score_NoRules_ReturnsShapeScore()
     {
         var set = RegionAnalyzer.Analyze(Egg(false).Barrier, W, H);
@@ -375,4 +522,246 @@ public class ColoringTests
     }
 
     private static string Short(string s) => (s.Length > 4 ? s.Substring(0, 4) : s).PadRight(4);
+
+    // ------------------------------------------------------------------
+    // Độ tròn (circularity) — bắt đường bao lồi lõm mà $P bỏ sót
+    // ------------------------------------------------------------------
+
+    [Test]
+    public void Circularity_SmoothCircle_IsInExpectedRange()
+    {
+        // LUU Y: circularity do bang cach dem canh pixel (ComputePerimeters), cong
+        // them mep brush-stamp (DrawPoints) von da gon song nhe o muc pixel, nen
+        // MOT HINH TRON VE TRON TUYET DOI cung chi do duoc khoang 0.4-0.6, KHONG
+        // gan 1.0 nhu cong thuc hinh hoc ly tuong. Da kiem chung bang mo phong
+        // Python doc lap (dia tron mau toan hoc, khong brush): ty le chu vi do
+        // duoc / chu vi thuc hoi tu ve 4/pi (~1.273) khi ban kinh lon, nen
+        // circularity ly thuyet toi da chi ~ pi^2/16 = 0.617 — con brush-stamp
+        // lam no thap hon nua. Vi vay test nay chi kiem tra hinh tron NAM TRONG
+        // mot khoang hop ly do thuc nghiem, khong ky vong gan 1.
+        var d = Draw(Ellipse(256, 256, 120, 120));
+        var set = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        float c = set.Regions[0].Circularity();
+        TestContext.WriteLine("circularity hinh tron = " + c);
+        Assert.Greater(c, 0.4f);
+        Assert.Less(c, 0.65f);
+    }
+
+    [Test]
+    public void Circularity_JaggedBlob_IsMuchLower()
+    {
+        var smooth = Draw(Ellipse(256, 256, 120, 120));
+        var jagged = Draw(JaggedBlob(256, 256, 120, 0.35f, 5));
+
+        float cSmooth = RegionAnalyzer.Analyze(smooth.Barrier, W, H).Regions[0].Circularity();
+        float cJagged = RegionAnalyzer.Analyze(jagged.Barrier, W, H).Regions[0].Circularity();
+        TestContext.WriteLine("tron = " + cSmooth + "  |  gon ghe = " + cJagged);
+
+        Assert.Less(cJagged, 0.7f);
+        Assert.Greater(cSmooth - cJagged, 0.15f, "hinh gon ghe phai thap hon ro ret");
+    }
+
+    [Test]
+    public void Score_Egg_SpikyOutline_CorrectPartsButIsCapped()
+    {
+        // Đúng tình huống cần bắt: lòng trắng có gai nhọn, nhưng đủ lòng đỏ, tô đúng màu,
+        // diện tích hợp lệ — $P vẫn cho hình khá cao. maxSpikiness phải chặn lại.
+        var d = Draw(Concat(SpikyWhite(12, 0.30f, 0.08f), Ellipse(270, 250, 45, 45, 1)), 25f);
+        Assert.IsTrue(FillWhite(d));
+        FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+        var r = ScoreEgg(d, shape: 0.68f);
+        TestContext.WriteLine(r.Report + "spike=" + r.PartResults[0].Spikiness);
+
+        Assert.Greater(r.PartResults[0].Spikiness, 0.008f);
+        Assert.Less(r.PartResults[0].SpikeFactor, 1f);
+        Assert.IsTrue(r.Capped);
+        Assert.Less(r.Total, 0.7f, "phải KHÔNG đạt dù hình và màu đều ổn");
+    }
+
+    [Test]
+    public void Score_Egg_MildSpikes_InRealMeasuredRange_AreCapped()
+    {
+        // Nét vẽ gai thật của người dùng (19/10) chỉ đo 0.0084–0.0163, nhẹ hơn nhiều so với
+        // hình mô phỏng gai rõ (0.02–0.04). Các hình gai nhẹ này cũng phải bị chặn.
+        foreach (var p in new[] { (12, 0.12f, 0.06f), (16, 0.12f, 0.10f), (12, 0.18f, 0.06f) })
+        {
+            var d = Draw(Concat(SpikyWhite(p.Item1, p.Item2, p.Item3), Ellipse(270, 250, 45, 45, 1)), 25f);
+            Assert.IsTrue(FillWhite(d));
+            FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+            var r = ScoreEgg(d, shape: 0.7f);
+            string tag = "n=" + p.Item1 + " h=" + p.Item2 + " w=" + p.Item3;
+            TestContext.WriteLine(tag + ": gai=" + r.PartResults[0].Spikiness + " tổng=" + r.Total);
+            Assert.Greater(r.PartResults[0].Spikiness, 0.0080f, tag);
+            Assert.Less(r.PartResults[0].Spikiness, 0.0200f, tag);
+            Assert.IsTrue(r.Capped, tag);
+            Assert.Less(r.Total, 0.7f, tag);
+        }
+    }
+
+    [Test]
+    public void Score_Egg_SpikeRuleOff_WhenMaxSpikinessIsZero_ButStillMeasured()
+    {
+        // Tái hiện lỗi thực tế: asset cũ có maxSpikiness = 0 → luật TẮT, trứng gai vẫn "đạt".
+        // Độ gai vẫn phải được đo và hiện trong báo cáo để phát hiện ra tình trạng này.
+        var d = Draw(Concat(SpikyWhite(12, 0.30f, 0.08f), Ellipse(270, 250, 45, 45, 1)), 25f);
+        Assert.IsTrue(FillWhite(d));
+        FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+        var rules = PartPresets.FriedEgg();
+        rules[0].maxSpikiness = 0f;
+        var r = IngredientScorer.Score(0.7f, RegionAnalyzer.Analyze(d.Barrier, W, H), d.Fill, _colors,
+                                       0.4f, rules, 0.5f);
+        Assert.Greater(r.PartResults[0].Spikiness, 0.015f, "vẫn phải đo được gai");
+        Assert.IsFalse(r.Capped, "luật tắt thì không chặn");
+        Assert.IsTrue(r.Report.Contains("luật gai TẮT"), "báo cáo phải nói rõ luật gai đang tắt");
+    }
+
+    [Test]
+    public void Score_Egg_OrganicWavyOutline_IsNotPenalized()
+    {
+        // Lòng trắng trứng thật: viền lượn sóng, không tròn, không gai → phải ĐẠT.
+        foreach (int seed in new[] { 1, 2, 3, 4 })
+        {
+            var d = Draw(Concat(OrganicWhite(seed, 0.26f), Ellipse(270, 250, 45, 45, 1)), 25f);
+            Assert.IsTrue(FillWhite(d), "seed " + seed);
+            FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+            var r = ScoreEgg(d, shape: 0.8f);
+            TestContext.WriteLine("seed " + seed + ": gai=" + r.PartResults[0].Spikiness + " tổng=" + r.Total);
+            Assert.LessOrEqual(r.PartResults[0].Spikiness, 0.0045f, "seed " + seed);
+            Assert.IsFalse(r.Capped, "seed " + seed);
+            Assert.GreaterOrEqual(r.Total, 0.85f, "seed " + seed);
+        }
+    }
+
+    [Test]
+    public void Spikiness_SmoothFarBelowSpiky()
+    {
+        var smooth = RegionAnalyzer.Analyze(Draw(Ellipse(256, 256, 190, 115)).Barrier, W, H).Regions[0].Spikiness;
+        var spiky = RegionAnalyzer.Analyze(Draw(SpikyWhite(12, 0.30f, 0.08f)).Barrier, W, H).Regions[0].Spikiness;
+        TestContext.WriteLine("trơn=" + smooth + "  gai=" + spiky);
+        Assert.Less(smooth, 0.004f);
+        Assert.Greater(spiky, 0.015f);
+    }
+
+    [Test]
+    public void Morphology_Open_MatchesBruteForce()
+    {
+        // So EDT-based Open với định nghĩa trực tiếp (co rồi nở bằng đĩa) trên hình ngẫu nhiên nhỏ.
+        var rng = new Random(7);
+        int w = 40, h = 33;
+        for (int trial = 0; trial < 6; trial++)
+        {
+            var m = new bool[w * h];
+            for (int y = 4; y < h - 4; y++)
+                for (int x = 4; x < w - 4; x++)
+                    m[y * w + x] = rng.NextDouble() < 0.82;
+            int r = 2 + trial % 3;
+
+            var fast = Morphology.Open(m, w, h, r);
+            var slow = BruteOpen(m, w, h, r);
+            for (int i = 0; i < m.Length; i++)
+                Assert.IsTrue(fast[i] == slow[i], "trial " + trial + " r=" + r + " pixel " + i);
+        }
+    }
+
+    private static bool[] BruteOpen(bool[] m, int w, int h, int r)
+    {
+        var er = new bool[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                bool ok = m[y * w + x];
+                for (int dy = -r; dy <= r && ok; dy++)
+                    for (int dx = -r; dx <= r && ok; dx++)
+                    {
+                        if (dx * dx + dy * dy > r * r) continue;
+                        int xx = x + dx, yy = y + dy;
+                        if (xx < 0 || xx >= w || yy < 0 || yy >= h || !m[yy * w + xx]) ok = false;
+                    }
+                er[y * w + x] = ok;
+            }
+        var op = new bool[w * h];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (er[y * w + x])
+                    for (int dy = -r; dy <= r; dy++)
+                        for (int dx = -r; dx <= r; dx++)
+                        {
+                            if (dx * dx + dy * dy > r * r) continue;
+                            int xx = x + dx, yy = y + dy;
+                            if (xx >= 0 && xx < w && yy >= 0 && yy < h) op[yy * w + xx] = true;
+                        }
+        return op;
+    }
+
+    [Test]
+    public void Score_Egg_SmoothOutline_RoundnessDoesNotPenalize()
+    {
+        var d = Egg(true);   // outer la ellipse tron, nhu truoc gio
+        FillAt(d, 90, 256, _colors.IndexOf("white"));
+        FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+        var r = ScoreEgg(d, shape: 0.97f);
+        TestContext.WriteLine(r.Report);
+
+        Assert.GreaterOrEqual(r.PartResults[0].RoundnessFactor, 0.95f);
+        Assert.GreaterOrEqual(r.Total, 0.9f);
+    }
+
+    [Test]
+    public void Score_ReportsRawCircularity_ForLogging()
+    {
+        var d = Egg(true);
+        FillAt(d, 90, 256, _colors.IndexOf("white"));
+        FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+        var r = ScoreEgg(d);
+        TestContext.WriteLine(r.Report + "outer=" + r.OuterCircularity + " inner=" + r.InnerCircularity);
+
+        // Số đã đo độc lập: lòng trắng (đã trừ lỗ) ~0.32, lòng đỏ ~0.57
+        Assert.Greater(r.OuterCircularity, 0.28f);
+        Assert.Less(r.OuterCircularity, 0.36f);
+        Assert.Greater(r.InnerCircularity, 0.52f);
+        Assert.Less(r.InnerCircularity, 0.62f);
+        // lòng đỏ có minRoundness nên PartResult ghi lại cùng số đo; lòng trắng dùng maxSpikiness
+        Assert.AreEqual(r.InnerCircularity, r.PartResults[1].Circularity, 0.0001f);
+    }
+
+    [Test]
+    public void Score_NoMinRoundness_SkipsCheck()
+    {
+        var rules = new[] { new PartRule { name = "body", role = PartRole.Outer, minCount = 1,
+                                           maxCount = 1, weight = 0.6f } };   // minRoundness = 0 (mac dinh)
+        var d = Draw(JaggedBlob(256, 256, 150, 0.4f, 6), 25f);
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        var r = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f, rules, 0.5f);
+        Assert.AreEqual(1f, r.PartResults[0].RoundnessFactor, 0.0001f);
+    }
+
+    /// <summary>
+    /// Ly do can roundnessCap rieng (khong chi nhan RoundnessFactor vao diem bo
+    /// phan): weight cua long trang chi 0.2 nen du RoundnessFactor tut het, phan
+    /// dong gop vao tong cung chi giam toi da 0.2 — khong du keo tong xuong duoi
+    /// nguong dat neu hinh va long do van tot. Test nay khoa chat GIA TRI cap
+    /// chinh xac (giong cach Score_NoRules_ShapeTooLow_IsStillCapped khoa shapeCap).
+    /// </summary>
+    [Test]
+    public void Score_Egg_SpikyOutline_UsesCapValueExactly()
+    {
+        var d = Draw(Concat(SpikyWhite(12, 0.30f, 0.08f), Ellipse(270, 250, 45, 45, 1)), 25f);
+        Assert.IsTrue(FillWhite(d));
+        FillAt(d, 270, 250, _colors.IndexOf("yellow"));
+
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        // hình ($P) cao, không thiếu bộ phận — chỉ có gai vi phạm, nên cap này là thứ chặn tổng
+        var r = IngredientScorer.Score(0.9f, regions, d.Fill, _colors, 0.4f,
+                                       PartPresets.FriedEgg(), missingCap: 0.5f,
+                                       minShape: 0.5f, shapeCap: 0.5f, roundnessCap: 0.42f);
+        TestContext.WriteLine(r.Report);
+
+        Assert.IsTrue(r.Capped);
+        Assert.AreEqual(0.42f, r.Total, 0.0001f);
+    }
 }

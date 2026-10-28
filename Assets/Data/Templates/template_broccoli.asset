@@ -1,0 +1,647 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0b8fbba6dac0f0248a344117542db40f, type: 3}
+  m_Name: template_broccoli
+  m_EditorClassIdentifier: 
+  ingredientId: broccoli
+  displayName: Broccoli
+  shapeType: 6
+  maxDistance: 0.12
+  rawPoints:
+  - X: 104
+    Y: 264
+    StrokeID: 0
+    ColorID: 0
+  - X: 103
+    Y: 266
+    StrokeID: 0
+    ColorID: 0
+  - X: 102
+    Y: 268
+    StrokeID: 0
+    ColorID: 0
+  - X: 101
+    Y: 270
+    StrokeID: 0
+    ColorID: 0
+  - X: 100
+    Y: 275
+    StrokeID: 0
+    ColorID: 0
+  - X: 101
+    Y: 280
+    StrokeID: 0
+    ColorID: 0
+  - X: 102
+    Y: 285
+    StrokeID: 0
+    ColorID: 0
+  - X: 105
+    Y: 289
+    StrokeID: 0
+    ColorID: 0
+  - X: 110
+    Y: 293
+    StrokeID: 0
+    ColorID: 0
+  - X: 115
+    Y: 295
+    StrokeID: 0
+    ColorID: 0
+  - X: 123
+    Y: 297
+    StrokeID: 0
+    ColorID: 0
+  - X: 129
+    Y: 297
+    StrokeID: 0
+    ColorID: 0
+  - X: 134
+    Y: 297
+    StrokeID: 0
+    ColorID: 0
+  - X: 138
+    Y: 297
+    StrokeID: 0
+    ColorID: 0
+  - X: 143
+    Y: 296
+    StrokeID: 0
+    ColorID: 0
+  - X: 144
+    Y: 298
+    StrokeID: 0
+    ColorID: 0
+  - X: 145
+    Y: 300
+    StrokeID: 0
+    ColorID: 0
+  - X: 148
+    Y: 305
+    StrokeID: 0
+    ColorID: 0
+  - X: 151
+    Y: 310
+    StrokeID: 0
+    ColorID: 0
+  - X: 154
+    Y: 314
+    StrokeID: 0
+    ColorID: 0
+  - X: 158
+    Y: 318
+    StrokeID: 0
+    ColorID: 0
+  - X: 165
+    Y: 320
+    StrokeID: 0
+    ColorID: 0
+  - X: 174
+    Y: 324
+    StrokeID: 0
+    ColorID: 0
+  - X: 184
+    Y: 326
+    StrokeID: 0
+    ColorID: 0
+  - X: 206
+    Y: 328
+    StrokeID: 0
+    ColorID: 0
+  - X: 215
+    Y: 327
+    StrokeID: 0
+    ColorID: 0
+  - X: 223
+    Y: 324
+    StrokeID: 0
+    ColorID: 0
+  - X: 228
+    Y: 320
+    StrokeID: 0
+    ColorID: 0
+  - X: 232
+    Y: 314
+    StrokeID: 0
+    ColorID: 0
+  - X: 235
+    Y: 309
+    StrokeID: 0
+    ColorID: 0
+  - X: 237
+    Y: 305
+    StrokeID: 0
+    ColorID: 0
+  - X: 239
+    Y: 300
+    StrokeID: 0
+    ColorID: 0
+  - X: 241
+    Y: 298
+    StrokeID: 0
+    ColorID: 0
+  - X: 248
+    Y: 297
+    StrokeID: 0
+    ColorID: 0
+  - X: 255
+    Y: 296
+    StrokeID: 0
+    ColorID: 0
+  - X: 263
+    Y: 294
+    StrokeID: 0
+    ColorID: 0
+  - X: 273
+    Y: 290
+    StrokeID: 0
+    ColorID: 0
+  - X: 281
+    Y: 287
+    StrokeID: 0
+    ColorID: 0
+  - X: 287
+    Y: 282
+    StrokeID: 0
+    ColorID: 0
+  - X: 292
+    Y: 278
+    StrokeID: 0
+    ColorID: 0
+  - X: 294
+    Y: 273
+    StrokeID: 0
+    ColorID: 0
+  - X: 296
+    Y: 269
+    StrokeID: 0
+    ColorID: 0
+  - X: 296
+    Y: 264
+    StrokeID: 0
+    ColorID: 0
+  - X: 295
+    Y: 262
+    StrokeID: 0
+    ColorID: 0
+  - X: 295
+    Y: 259
+    StrokeID: 0
+    ColorID: 0
+  - X: 295
+    Y: 252
+    StrokeID: 0
+    ColorID: 0
+  - X: 294
+    Y: 250
+    StrokeID: 0
+    ColorID: 0
+  - X: 290
+    Y: 244
+    StrokeID: 0
+    ColorID: 0
+  - X: 286
+    Y: 240
+    StrokeID: 0
+    ColorID: 0
+  - X: 281
+    Y: 236
+    StrokeID: 0
+    ColorID: 0
+  - X: 279
+    Y: 235
+    StrokeID: 0
+    ColorID: 0
+  - X: 275
+    Y: 232
+    StrokeID: 0
+    ColorID: 0
+  - X: 276
+    Y: 230
+    StrokeID: 0
+    ColorID: 0
+  - X: 277
+    Y: 228
+    StrokeID: 0
+    ColorID: 0
+  - X: 277
+    Y: 222
+    StrokeID: 0
+    ColorID: 0
+  - X: 274
+    Y: 216
+    StrokeID: 0
+    ColorID: 0
+  - X: 265
+    Y: 210
+    StrokeID: 0
+    ColorID: 0
+  - X: 257
+    Y: 205
+    StrokeID: 0
+    ColorID: 0
+  - X: 249
+    Y: 202
+    StrokeID: 0
+    ColorID: 0
+  - X: 240
+    Y: 200
+    StrokeID: 0
+    ColorID: 0
+  - X: 235
+    Y: 199
+    StrokeID: 0
+    ColorID: 0
+  - X: 231
+    Y: 199
+    StrokeID: 0
+    ColorID: 0
+  - X: 225
+    Y: 199
+    StrokeID: 0
+    ColorID: 0
+  - X: 220
+    Y: 200
+    StrokeID: 0
+    ColorID: 0
+  - X: 216
+    Y: 201
+    StrokeID: 0
+    ColorID: 0
+  - X: 211
+    Y: 202
+    StrokeID: 0
+    ColorID: 0
+  - X: 208
+    Y: 202
+    StrokeID: 0
+    ColorID: 0
+  - X: 206
+    Y: 201
+    StrokeID: 0
+    ColorID: 0
+  - X: 197
+    Y: 200
+    StrokeID: 0
+    ColorID: 0
+  - X: 187
+    Y: 197
+    StrokeID: 0
+    ColorID: 0
+  - X: 172
+    Y: 194
+    StrokeID: 0
+    ColorID: 0
+  - X: 159
+    Y: 193
+    StrokeID: 0
+    ColorID: 0
+  - X: 148
+    Y: 194
+    StrokeID: 0
+    ColorID: 0
+  - X: 138
+    Y: 196
+    StrokeID: 0
+    ColorID: 0
+  - X: 133
+    Y: 199
+    StrokeID: 0
+    ColorID: 0
+  - X: 130
+    Y: 203
+    StrokeID: 0
+    ColorID: 0
+  - X: 127
+    Y: 206
+    StrokeID: 0
+    ColorID: 0
+  - X: 126
+    Y: 209
+    StrokeID: 0
+    ColorID: 0
+  - X: 124
+    Y: 210
+    StrokeID: 0
+    ColorID: 0
+  - X: 121
+    Y: 210
+    StrokeID: 0
+    ColorID: 0
+  - X: 115
+    Y: 212
+    StrokeID: 0
+    ColorID: 0
+  - X: 107
+    Y: 215
+    StrokeID: 0
+    ColorID: 0
+  - X: 101
+    Y: 219
+    StrokeID: 0
+    ColorID: 0
+  - X: 95
+    Y: 224
+    StrokeID: 0
+    ColorID: 0
+  - X: 90
+    Y: 231
+    StrokeID: 0
+    ColorID: 0
+  - X: 86
+    Y: 241
+    StrokeID: 0
+    ColorID: 0
+  - X: 86
+    Y: 248
+    StrokeID: 0
+    ColorID: 0
+  - X: 88
+    Y: 257
+    StrokeID: 0
+    ColorID: 0
+  - X: 90
+    Y: 259
+    StrokeID: 0
+    ColorID: 0
+  - X: 94
+    Y: 262
+    StrokeID: 0
+    ColorID: 0
+  - X: 97
+    Y: 263
+    StrokeID: 0
+    ColorID: 0
+  - X: 99
+    Y: 264
+    StrokeID: 0
+    ColorID: 0
+  - X: 101
+    Y: 265
+    StrokeID: 0
+    ColorID: 0
+  - X: 140
+    Y: 198
+    StrokeID: 1
+    ColorID: 0
+  - X: 141
+    Y: 196
+    StrokeID: 1
+    ColorID: 0
+  - X: 143
+    Y: 194
+    StrokeID: 1
+    ColorID: 0
+  - X: 144
+    Y: 192
+    StrokeID: 1
+    ColorID: 0
+  - X: 149
+    Y: 185
+    StrokeID: 1
+    ColorID: 0
+  - X: 155
+    Y: 174
+    StrokeID: 1
+    ColorID: 0
+  - X: 156
+    Y: 171
+    StrokeID: 1
+    ColorID: 0
+  - X: 157
+    Y: 169
+    StrokeID: 1
+    ColorID: 0
+  - X: 158
+    Y: 167
+    StrokeID: 1
+    ColorID: 0
+  - X: 160
+    Y: 164
+    StrokeID: 1
+    ColorID: 0
+  - X: 166
+    Y: 149
+    StrokeID: 1
+    ColorID: 0
+  - X: 172
+    Y: 134
+    StrokeID: 1
+    ColorID: 0
+  - X: 179
+    Y: 116
+    StrokeID: 1
+    ColorID: 0
+  - X: 186
+    Y: 100
+    StrokeID: 1
+    ColorID: 0
+  - X: 190
+    Y: 91
+    StrokeID: 1
+    ColorID: 0
+  - X: 191
+    Y: 87
+    StrokeID: 1
+    ColorID: 0
+  - X: 193
+    Y: 86
+    StrokeID: 1
+    ColorID: 0
+  - X: 195
+    Y: 87
+    StrokeID: 1
+    ColorID: 0
+  - X: 198
+    Y: 87
+    StrokeID: 1
+    ColorID: 0
+  - X: 217
+    Y: 86
+    StrokeID: 1
+    ColorID: 0
+  - X: 230
+    Y: 87
+    StrokeID: 1
+    ColorID: 0
+  - X: 233
+    Y: 87
+    StrokeID: 1
+    ColorID: 0
+  - X: 234
+    Y: 89
+    StrokeID: 1
+    ColorID: 0
+  - X: 234
+    Y: 92
+    StrokeID: 1
+    ColorID: 0
+  - X: 234
+    Y: 97
+    StrokeID: 1
+    ColorID: 0
+  - X: 235
+    Y: 110
+    StrokeID: 1
+    ColorID: 0
+  - X: 235
+    Y: 122
+    StrokeID: 1
+    ColorID: 0
+  - X: 235
+    Y: 136
+    StrokeID: 1
+    ColorID: 0
+  - X: 235
+    Y: 149
+    StrokeID: 1
+    ColorID: 0
+  - X: 235
+    Y: 161
+    StrokeID: 1
+    ColorID: 0
+  - X: 235
+    Y: 164
+    StrokeID: 1
+    ColorID: 0
+  - X: 236
+    Y: 166
+    StrokeID: 1
+    ColorID: 0
+  - X: 237
+    Y: 169
+    StrokeID: 1
+    ColorID: 0
+  - X: 238
+    Y: 171
+    StrokeID: 1
+    ColorID: 0
+  - X: 241
+    Y: 179
+    StrokeID: 1
+    ColorID: 0
+  - X: 246
+    Y: 186
+    StrokeID: 1
+    ColorID: 0
+  - X: 249
+    Y: 192
+    StrokeID: 1
+    ColorID: 0
+  - X: 251
+    Y: 196
+    StrokeID: 1
+    ColorID: 0
+  - X: 252
+    Y: 199
+    StrokeID: 1
+    ColorID: 0
+  - X: 253
+    Y: 201
+    StrokeID: 1
+    ColorID: 0
+  - X: 254
+    Y: 203
+    StrokeID: 1
+    ColorID: 0
+  - X: 255
+    Y: 205
+    StrokeID: 1
+    ColorID: 0
+  - X: 256
+    Y: 207
+    StrokeID: 1
+    ColorID: 0
+  - X: 254
+    Y: 208
+    StrokeID: 1
+    ColorID: 0
+  - X: 173
+    Y: 191
+    StrokeID: 2
+    ColorID: 0
+  - X: 172
+    Y: 189
+    StrokeID: 2
+    ColorID: 0
+  - X: 174
+    Y: 188
+    StrokeID: 2
+    ColorID: 0
+  - X: 176
+    Y: 186
+    StrokeID: 2
+    ColorID: 0
+  - X: 180
+    Y: 179
+    StrokeID: 2
+    ColorID: 0
+  - X: 186
+    Y: 171
+    StrokeID: 2
+    ColorID: 0
+  - X: 188
+    Y: 166
+    StrokeID: 2
+    ColorID: 0
+  - X: 190
+    Y: 164
+    StrokeID: 2
+    ColorID: 0
+  - X: 191
+    Y: 166
+    StrokeID: 2
+    ColorID: 0
+  - X: 192
+    Y: 168
+    StrokeID: 2
+    ColorID: 0
+  - X: 195
+    Y: 176
+    StrokeID: 2
+    ColorID: 0
+  - X: 199
+    Y: 184
+    StrokeID: 2
+    ColorID: 0
+  - X: 202
+    Y: 190
+    StrokeID: 2
+    ColorID: 0
+  - X: 205
+    Y: 195
+    StrokeID: 2
+    ColorID: 0
+  - X: 207
+    Y: 198
+    StrokeID: 2
+    ColorID: 0
+  - X: 208
+    Y: 200
+    StrokeID: 2
+    ColorID: 0
+  - X: 209
+    Y: 202
+    StrokeID: 2
+    ColorID: 0
+  - X: 208
+    Y: 200
+    StrokeID: 2
+    ColorID: 0
+  strokeCount: 3
+  shapeWeight: 0.4
+  missingPartCap: 0.5
+  minShape: 0.5
+  shapeCap: 0.5
+  roundnessCap: 0.5
+  parts: []
+  notes: 

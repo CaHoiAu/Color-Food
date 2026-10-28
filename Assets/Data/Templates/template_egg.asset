@@ -468,6 +468,8 @@ MonoBehaviour:
   strokeCount: 2
   shapeWeight: 0.4
   missingPartCap: 0.5
+  minShape: 0.62
+  shapeCap: 0.5
   parts:
   - name: white
     role: 0

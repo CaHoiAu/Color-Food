@@ -360,7 +360,9 @@ namespace ColorFood.Drawing
 
             return IngredientScorer.Score(shape, AnalyzeRegions(), _fill, palette.Table,
                                           template.shapeWeight, template.parts,
-                                          template.missingPartCap);
+                                          template.missingPartCap,
+                                          template.minShape, template.shapeCap,
+                                          template.roundnessCap);
         }
 
         /// <summary>

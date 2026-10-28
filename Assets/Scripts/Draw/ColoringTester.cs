@@ -25,7 +25,10 @@ namespace ColorFood.Drawing
     /// nằm ở mép trái Game view nên cần Game view đủ rộng (ví dụ Full HD 1920×1080).
     ///
     /// CSV scoring_log.csv nằm cạnh calibration.csv (đường dẫn in ra Console):
-    /// time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions
+    /// time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner
+    /// (circOuter/circInner = độ tròn thô, spikeOuter/spikeInner = độ gai của lòng trắng/lòng đỏ,
+    ///  dùng để hiệu chỉnh minRoundness / maxSpikiness.
+    ///  Header đổi nên file cũ tự được cất thành scoring_log.csv.old-... và tạo file mới.)
     /// Đây là dữ liệu cho thí nghiệm "trước/sau luật bộ phận".
     /// </summary>
     public class ColoringTester : MonoBehaviour
@@ -38,7 +41,7 @@ namespace ColorFood.Drawing
         [SerializeField] private string csvFileName = "scoring_log.csv";
 
         private const string CsvHeader =
-            "time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions";
+            "time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner";
 
         private readonly PDollarRecognizer _recognizer = new PDollarRecognizer();
         private int _index;
@@ -74,6 +77,18 @@ namespace ColorFood.Drawing
             var keys = new StringBuilder();
             for (int i = 0; i < ingredients.Count && i < 9; i++)
                 keys.Append($"  [{i + 1}] {ingredients[i].ingredientId}");
+
+            // In luật bộ phận THỰC SỰ đang nằm trong asset, để thấy ngay khi asset cũ còn
+            // giá trị 0 (luật tắt) hoặc chưa áp preset.
+            foreach (var ing in ingredients)
+            {
+                var sb = new StringBuilder();
+                if (ing.parts == null || ing.parts.Length == 0) sb.Append(" (không có luật bộ phận)");
+                else
+                    foreach (var p in ing.parts)
+                        sb.Append($"\n    {p.name} [{p.role}] maxGai={p.maxSpikiness:0.0000} minTròn={p.minRoundness:0.00}");
+                Debug.Log($"[ColoringTester] Luật của '{ing.ingredientId}':{sb}  | minShape={ing.minShape:0.00} roundnessCap={ing.roundnessCap:0.00}");
+            }
 
             Debug.Log("[ColoringTester] Sẵn sàng. Phím nguyên liệu:" + keys +
                       "\nD = vẽ, F = tô, [ ] = đổi màu, ENTER = chấm điểm, C = xóa.\n" +
@@ -135,6 +150,10 @@ namespace ColorFood.Drawing
             row.Append(',').Append(r.Capped ? 1 : 0);
             row.Append(',').Append(r.OuterCount);
             row.Append(',').Append(r.InnerCount);
+            row.Append(',').Append(r.OuterCircularity.ToString("F4", CultureInfo.InvariantCulture));
+            row.Append(',').Append(r.InnerCircularity.ToString("F4", CultureInfo.InvariantCulture));
+            row.Append(',').Append(r.OuterSpikiness.ToString("F4", CultureInfo.InvariantCulture));
+            row.Append(',').Append(r.InnerSpikiness.ToString("F4", CultureInfo.InvariantCulture));
             File.AppendAllText(_csvPath, row + "\n", new UTF8Encoding(false));
         }
 
