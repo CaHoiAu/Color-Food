@@ -14,7 +14,9 @@ namespace ColorFood.EditorTools
     /// IngredientTemplate. Mở: menu  Color Food → Template Recorder.
     ///
     /// Hai tab:
-    ///   1. Vẽ template — vẽ nét mẫu, đặt ID/hình dạng, bấm Lưu.
+    ///   1. Vẽ template — vẽ nét mẫu, đặt ID/hình dạng, bấm Lưu. Một nguyên
+    ///      liệu có thể có NHIỀU MẪU: lưu vào asset đã có thì chọn "Thêm làm
+    ///      mẫu mới" (hoặc ghi đè mẫu đang sửa).
     ///   2. Thử chấm điểm — vẽ thử nhiều lần để xem khoảng cách d và để tool
     ///      ĐỀ XUẤT maxDistance riêng cho nguyên liệu đó.
     ///
@@ -63,6 +65,7 @@ namespace ColorFood.EditorTools
 
         // --- trạng thái ---
         private Mode _mode = Mode.Record;
+        private Vector2 _scroll;
         private readonly Sketch _record = new Sketch();
         private readonly Sketch _test = new Sketch();
 
@@ -73,11 +76,15 @@ namespace ColorFood.EditorTools
         private string _notes = "";
 
         private IngredientTemplate _loaded;     // template đang sửa / đang thử
+        private int _variant;                   // mẫu được chọn trong _loaded
+        private IngredientTemplate _editing;    // asset mà _record đang nạp từ đó (null = vẽ mới)
+        private int _editingVariant;            // mẫu mà _record đang nạp
 
         private readonly PDollarRecognizer _recognizer = new PDollarRecognizer();
         private readonly List<float> _testDistances = new List<float>();
         private float _lastDistance = -1f;
         private float _lastScore = -1f;
+        private string _lastMatched = "";
 
         // ------------------------------------------------------------------
 
@@ -99,8 +106,11 @@ namespace ColorFood.EditorTools
 
             EditorGUILayout.Space(6);
 
+            // Cửa sổ thấp hơn nội dung thì cuộn được, không che mất các nút dưới canvas
+            _scroll = EditorGUILayout.BeginScrollView(_scroll);
             if (_mode == Mode.Record) DrawRecordTab();
             else                      DrawTestTab();
+            EditorGUILayout.EndScrollView();
         }
 
         // ---------------------------- TAB 1 -------------------------------
@@ -114,9 +124,28 @@ namespace ColorFood.EditorTools
             using (new EditorGUI.DisabledScope(_loaded == null))
             {
                 if (GUILayout.Button("Nạp để sửa", GUILayout.Width(90)))
-                    LoadFromAsset(_loaded);
+                    LoadFromAsset(_loaded, _variant);
             }
             EditorGUILayout.EndHorizontal();
+
+            if (_loaded != null)
+            {
+                EditorGUILayout.BeginHorizontal();
+                _variant = EditorGUILayout.Popup("Mẫu", Mathf.Clamp(_variant, 0, _loaded.VariantCount - 1),
+                                                 VariantLabels(_loaded));
+                using (new EditorGUI.DisabledScope(_loaded.VariantCount <= 1))
+                {
+                    if (GUILayout.Button("Xóa mẫu", GUILayout.Width(90)))
+                        RemoveVariant(_loaded, _variant);
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.LabelField(
+                _editing == null
+                    ? "Đang vẽ mới"
+                    : $"Đang sửa: {_editing.ingredientId} — {_editing.GetVariantLabel(_editingVariant)}",
+                EditorStyles.miniBoldLabel);
 
             EditorGUILayout.Space(2);
 
@@ -128,7 +157,9 @@ namespace ColorFood.EditorTools
             EditorGUILayout.HelpBox(
                 "Vẽ ĐÚNG HƯỚNG như sẽ hiện trong game (tam giác đỉnh hướng lên, " +
                 "chữ nhật nằm ngang...). $P không bất biến với phép xoay.\n" +
-                "Hình nhiều nét thì vẽ nhiều nét (trứng rán: lòng trắng + lòng đỏ).",
+                "Hình nhiều nét thì vẽ nhiều nét (trứng rán: lòng trắng + lòng đỏ).\n" +
+                "Nguyên liệu có nhiều cách vẽ (nguyên quả / bổ đôi...) thì lưu mỗi " +
+                "cách thành một MẪU của cùng ID — khi chấm sẽ lấy mẫu giống nhất.",
                 MessageType.Info);
 
             DrawCanvas(_record);
@@ -139,6 +170,12 @@ namespace ColorFood.EditorTools
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Hoàn tác nét cuối")) { _record.UndoLastStroke(); Repaint(); }
             if (GUILayout.Button("Xóa hết"))           { _record.Clear();           Repaint(); }
+            if (GUILayout.Button("Vẽ mới"))
+            {
+                _record.Clear();
+                _editing = null;
+                Repaint();
+            }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4);
@@ -166,7 +203,8 @@ namespace ColorFood.EditorTools
             }
 
             EditorGUILayout.LabelField(
-                $"{_loaded.ingredientId}  |  maxDistance hiện tại: {_loaded.maxDistance:F3}",
+                $"{_loaded.ingredientId}  |  {_loaded.GetClouds().Count} mẫu  |  " +
+                $"maxDistance hiện tại: {_loaded.maxDistance:F3}",
                 EditorStyles.miniBoldLabel);
 
             EditorGUILayout.HelpBox(
@@ -211,10 +249,12 @@ namespace ColorFood.EditorTools
             if (_test.Points.Count < 2) return;
 
             var drawn = new PointCloud("test", _test.Points);
-            var template = _loaded.GetCloud();
+            var clouds = _loaded.GetClouds();
 
-            _lastDistance = _recognizer.Match(drawn, template);
-            _lastScore = _recognizer.MatchScore(drawn, template, _loaded.maxDistance);
+            // So với mọi mẫu, lấy mẫu giống nhất — giống hệt cách chấm trong game
+            _lastDistance = _recognizer.MatchBest(drawn, clouds, out int best);
+            _lastScore = PDollarRecognizer.ScoreFromDistance(_lastDistance, _loaded.maxDistance);
+            _lastMatched = clouds[best].Name;
             _testDistances.Add(_lastDistance);
 
             _test.Clear();
@@ -236,6 +276,9 @@ namespace ColorFood.EditorTools
             EditorGUILayout.LabelField(
                 $"Lần vừa rồi:  d = {_lastDistance:F5}   score = {_lastScore:P0}   " +
                 (pass ? "ĐẠT" : "CHƯA ĐẠT"), style);
+
+            if (_loaded.GetClouds().Count > 1)
+                EditorGUILayout.LabelField($"Giống nhất với mẫu: {_lastMatched}", EditorStyles.miniLabel);
 
             if (_testDistances.Count < 5)
             {
@@ -404,9 +447,39 @@ namespace ColorFood.EditorTools
             return s.Trim('_');
         }
 
-        private void LoadFromAsset(IngredientTemplate asset)
+        private static string[] VariantLabels(IngredientTemplate asset)
+        {
+            var labels = new string[asset.VariantCount];
+            for (int i = 0; i < labels.Length; i++)
+            {
+                Point[] pts = asset.GetVariantPoints(i);
+                labels[i] = $"{asset.GetVariantLabel(i)}  ({asset.GetVariantStrokeCount(i)} nét, " +
+                            $"{(pts == null ? 0 : pts.Length)} điểm)";
+            }
+            return labels;
+        }
+
+        private void RemoveVariant(IngredientTemplate asset, int index)
+        {
+            if (!EditorUtility.DisplayDialog("Xóa mẫu?",
+                    $"Xóa {asset.GetVariantLabel(index)} khỏi {asset.name}?", "Xóa", "Hủy"))
+                return;
+
+            Undo.RecordObject(asset, "Remove template variant");
+            if (!asset.RemoveVariant(index)) return;
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssets();
+
+            // Chỉ số các mẫu sau bị dời; nét đang sửa không còn gắn với mẫu nào
+            if (_editing == asset) _editing = null;
+            _variant = Mathf.Clamp(_variant, 0, asset.VariantCount - 1);
+            Repaint();
+        }
+
+        private void LoadFromAsset(IngredientTemplate asset, int variant)
         {
             if (asset == null) return;
+            variant = Mathf.Clamp(variant, 0, asset.VariantCount - 1);
 
             _id = asset.ingredientId;
             _displayName = asset.displayName;
@@ -415,8 +488,12 @@ namespace ColorFood.EditorTools
             _notes = asset.notes;
 
             _record.Clear();
-            if (asset.rawPoints != null)
-                _record.Points.AddRange(asset.rawPoints);
+            Point[] points = asset.GetVariantPoints(variant);
+            if (points != null)
+                _record.Points.AddRange(points);
+
+            _editing = asset;
+            _editingVariant = variant;
 
             _record.StrokeId = _record.Points.Count == 0
                 ? 0
@@ -446,37 +523,64 @@ namespace ColorFood.EditorTools
             string path = $"{SaveFolder}/template_{id}.asset";
 
             IngredientTemplate asset = AssetDatabase.LoadAssetAtPath<IngredientTemplate>(path);
+            Point[] points = _record.Points.ToArray();
+            int saved;
+            bool writeInfo = true;   // ghi ID/tên/maxDistance/ghi chú từ cửa sổ vào asset
+
             if (asset != null)
             {
-                if (!EditorUtility.DisplayDialog("Ghi đè?",
-                        $"{path} đã tồn tại. Thay bằng nét vẽ hiện tại?", "Ghi đè", "Hủy"))
-                    return;
+                // Đang sửa đúng asset này thì mặc định ghi đè mẫu đang sửa, ngược lại mẫu chính
+                int target = _editing == asset ? _editingVariant : 0;
+                int choice = EditorUtility.DisplayDialogComplex("Template đã tồn tại",
+                    $"{path} đã có {asset.VariantCount} mẫu.\n\n" +
+                    "• Thêm làm mẫu mới: giữ các mẫu cũ, thêm một cách vẽ nữa.\n" +
+                    $"• Ghi đè: thay {asset.GetVariantLabel(target)} bằng nét vẽ hiện tại.",
+                    "Thêm làm mẫu mới", "Hủy", "Ghi đè " + asset.GetVariantLabel(target));
+                if (choice == 1) return;
 
                 Undo.RecordObject(asset, "Update ingredient template");
+                if (choice == 0)
+                {
+                    saved = asset.AddVariant(points, _record.StrokeCount);
+                    // Chưa nạp asset này thì các ô trong cửa sổ không phải của nó —
+                    // giữ nguyên maxDistance đã hiệu chỉnh, không đè bằng giá trị mặc định.
+                    writeInfo = _editing == asset;
+                }
+                else
+                {
+                    asset.SetVariant(target, points, _record.StrokeCount);
+                    saved = target;
+                }
             }
             else
             {
                 asset = CreateInstance<IngredientTemplate>();
                 AssetDatabase.CreateAsset(asset, path);
+                asset.SetVariant(0, points, _record.StrokeCount);
+                saved = 0;
             }
 
-            asset.ingredientId = id;
-            asset.displayName = _displayName;
-            asset.shapeType = _shape;
-            asset.maxDistance = _maxDistance;
-            asset.notes = _notes;
-            asset.rawPoints = _record.Points.ToArray();
-            asset.strokeCount = _record.StrokeCount;
-            asset.InvalidateCache();
+            if (writeInfo)
+            {
+                asset.ingredientId = id;
+                asset.displayName = _displayName;
+                asset.shapeType = _shape;
+                asset.maxDistance = _maxDistance;
+                asset.notes = _notes;
+            }
 
             EditorUtility.SetDirty(asset);
             AssetDatabase.SaveAssets();
 
             _id = id;
             _loaded = asset;
+            _variant = saved;
+            _editing = asset;
+            _editingVariant = saved;
             EditorGUIUtility.PingObject(asset);
 
-            Debug.Log($"[TemplateRecorder] Đã lưu {path}  ({asset.strokeCount} nét, {asset.rawPoints.Length} điểm)");
+            Debug.Log($"[TemplateRecorder] Đã lưu {path} — {asset.GetVariantLabel(saved)}  " +
+                      $"({_record.StrokeCount} nét, {points.Length} điểm; tổng {asset.VariantCount} mẫu)");
         }
     }
 }

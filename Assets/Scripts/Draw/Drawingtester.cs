@@ -57,7 +57,7 @@ namespace ColorFood.Drawing
         private readonly PDollarRecognizer _recognizer = new PDollarRecognizer();
         private readonly Dictionary<string, int> _sampleCount = new Dictionary<string, int>();
 
-        private Dictionary<string, PointCloud> _templates;
+        private Dictionary<string, IReadOnlyList<PointCloud>> _templates;   // mọi mẫu của từng nguyên liệu
         private Dictionary<string, float> _maxDistances;   // maxDistance riêng từng template
         private string[] _templateOrder;                   // thứ tự phím 1..9 và cột CSV
         private string _label;                             // hình bạn định vẽ
@@ -130,10 +130,11 @@ namespace ColorFood.Drawing
 
             // Khoảng cách tới TẤT CẢ template, để thấy hệ thống có phân biệt được không.
             // Trong game thật chỉ so với MỘT template (Guided Shape Matching).
+            // Nguyên liệu nhiều mẫu: khoảng cách = mẫu giống nhất.
             foreach (string name in _templateOrder)
             {
-                float d = _recognizer.Match(drawn, _templates[name]);
-                float s = _recognizer.MatchScore(drawn, _templates[name], _maxDistances[name]);
+                float d = _recognizer.MatchBest(drawn, _templates[name], out _);
+                float s = PDollarRecognizer.ScoreFromDistance(d, _maxDistances[name]);
 
                 row.Append(',').Append(d.ToString("F5", CultureInfo.InvariantCulture));
 
@@ -145,7 +146,8 @@ namespace ColorFood.Drawing
 
             _sampleCount[_label] = (_sampleCount.TryGetValue(_label, out int c) ? c : 0) + 1;
 
-            float own = _recognizer.MatchScore(drawn, _templates[_label], _maxDistances[_label]);
+            float own = PDollarRecognizer.ScoreFromDistance(
+                _recognizer.MatchBest(drawn, _templates[_label], out _), _maxDistances[_label]);
             bool pass = own >= passThreshold;
             log.Append(pass
                 ? $"<color=green>ĐẠT</color> {own:P0}"
@@ -192,7 +194,7 @@ namespace ColorFood.Drawing
 
         private void BuildTemplates()
         {
-            _templates = new Dictionary<string, PointCloud>();
+            _templates = new Dictionary<string, IReadOnlyList<PointCloud>>();
             _maxDistances = new Dictionary<string, float>();
             var order = new List<string>();
 
@@ -207,7 +209,7 @@ namespace ColorFood.Drawing
                         Debug.LogWarning($"[DrawingTester] Trùng ID '{t.ingredientId}', bỏ qua bản sau.");
                         continue;
                     }
-                    _templates[t.ingredientId] = t.GetCloud();
+                    _templates[t.ingredientId] = t.GetClouds();
                     _maxDistances[t.ingredientId] = t.maxDistance;
                     order.Add(t.ingredientId);
                 }
@@ -228,7 +230,7 @@ namespace ColorFood.Drawing
 
         private void AddGenerated(List<string> order, string name, List<Point> points)
         {
-            _templates[name] = new PointCloud(name, points);
+            _templates[name] = new[] { new PointCloud(name, points) };
             _maxDistances[name] = maxDistance;
             order.Add(name);
         }

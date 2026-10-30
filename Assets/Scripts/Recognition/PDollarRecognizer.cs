@@ -12,10 +12,21 @@ namespace ColorFood.Recognition
         }
         public float MatchScore(PointCloud drawn, PointCloud template, float maxDistance = 0.09f)
         {
-            float d = Match(drawn, template);
-            float score = 1f - (d / maxDistance);
+            return ScoreFromDistance(Match(drawn, template), maxDistance);
+        }
+
+        /// <summary>Đổi khoảng cách $P thành điểm 0..1: d = 0 → 1, d ≥ maxDistance → 0.</summary>
+        public static float ScoreFromDistance(float distance, float maxDistance)
+        {
+            float score = 1f - (distance / maxDistance);
             return score < 0f ? 0f : (score > 1f ? 1f : score);
         }
+
+        /// <summary>
+        /// So nét vẽ với NHIỀU mẫu của cùng một nguyên liệu, trả về khoảng cách
+        /// nhỏ nhất (mẫu giống nhất thắng). bestIndex = vị trí mẫu đó, -1 nếu
+        /// danh sách rỗng (khi đó trả về float.MaxValue).
+        /// </summary>
         public float MatchBest(PointCloud drawn, IReadOnlyList<PointCloud> templates, out int bestIndex)
         {
             bestIndex = -1;
@@ -29,16 +40,6 @@ namespace ColorFood.Recognition
                 if (d < best) { best = d; bestIndex = i; }
             }
             return best;
-        }
-
-        /// <summary>Điểm 0..1 theo mẫu giống nhất trong danh sách (xem MatchBest).</summary>
-        public float MatchBestScore(PointCloud drawn, IReadOnlyList<PointCloud> templates,
-                                    float maxDistance, out int bestIndex)
-        {
-            float d = MatchBest(drawn, templates, out bestIndex);
-            if (bestIndex < 0) return 0f;
-            float score = 1f - (d / maxDistance);
-            return score < 0f ? 0f : (score > 1f ? 1f : score);
         }
         public (string name, float score) Classify(
             PointCloud drawn, IEnumerable<PointCloud> templates, float maxDistance = 0.09f)

@@ -348,4 +348,111 @@ public class PDollarTests
         // cân nhắc nới maxDistance hoặc thêm bước chuẩn hóa góc.
         Assert.Less(d, 0.15f, $"Xoay 15 độ vẫn nên khớp. Khoảng cách: {d}");
     }
+
+    // ------------------------------------------------------------------
+    // TEST 9 — Nhiều mẫu cho một nguyên liệu: mẫu giống nhất thắng
+    // ------------------------------------------------------------------
+
+    [Test]
+    public void MatchBest_PicksClosestVariant()
+    {
+        var circle = new PointCloud("circle", MakeCircle(0, 0, 50));
+        var square = new PointCloud("square", MakeSquare(0, 0, 100));
+        var drawn = new PointCloud("drawn", MakeSquare(300, 300, 60));
+
+        var variants = new List<PointCloud> { circle, square };
+        float best = _recognizer.MatchBest(drawn, variants, out int index);
+
+        Assert.AreEqual(1, index, "Hình vuông phải khớp mẫu vuông (index 1)");
+        Assert.AreEqual(_recognizer.Match(drawn, square), best, 1e-6f);
+        Assert.Less(best, _recognizer.Match(drawn, circle));
+    }
+
+    [Test]
+    public void MatchBest_ScoreNotLowerThanSingleTemplate()
+    {
+        var circle = new PointCloud("circle", MakeCircle(0, 0, 50));
+        var square = new PointCloud("square", MakeSquare(0, 0, 100));
+        var drawn = new PointCloud("drawn", MakeSquare(0, 0, 80));
+
+        float single = _recognizer.MatchScore(drawn, circle, 0.12f);
+        float multi = PDollarRecognizer.ScoreFromDistance(
+            _recognizer.MatchBest(drawn, new List<PointCloud> { circle, square }, out _), 0.12f);
+
+        Assert.GreaterOrEqual(multi, single, "Thêm mẫu không được làm điểm tụt");
+    }
+
+    [Test]
+    public void MatchBest_EmptyList_ReturnsNoMatch()
+    {
+        var drawn = new PointCloud("drawn", MakeCircle(0, 0, 50));
+
+        float d = _recognizer.MatchBest(drawn, new List<PointCloud>(), out int index);
+
+        Assert.AreEqual(-1, index);
+        Assert.AreEqual(float.MaxValue, d);
+        Assert.AreEqual(0f, PDollarRecognizer.ScoreFromDistance(d, 0.12f));
+    }
+
+    // ------------------------------------------------------------------
+    // TEST 10 — Tự sinh góc độ (xoay / lật) từ một mẫu
+    // ------------------------------------------------------------------
+
+    [Test]
+    public void PointTransform_Rotate90_AroundCentroid()
+    {
+        // Đoạn ngang quanh (0,0) xoay +90° (ngược kim đồng hồ) thành đoạn dọc
+        var pts = new List<Point> { new Point(-10, 0, 0), new Point(10, 0, 0) };
+        var r = PointTransform.Rotate(pts, 90f);
+
+        Assert.AreEqual(0f, r[0].X, 1e-4f);
+        Assert.AreEqual(-10f, r[0].Y, 1e-4f);
+        Assert.AreEqual(0f, r[1].X, 1e-4f);
+        Assert.AreEqual(10f, r[1].Y, 1e-4f);
+    }
+
+    [Test]
+    public void PointTransform_MirrorX_KeepsStrokeAndCentroid()
+    {
+        var pts = new List<Point> { new Point(0, 0, 0), new Point(10, 5, 1) };
+        var m = PointTransform.MirrorX(pts);
+
+        Assert.AreEqual(10f, m[0].X, 1e-4f);
+        Assert.AreEqual(0f, m[1].X, 1e-4f);
+        Assert.AreEqual(5f, m[1].Y, 1e-4f);
+        Assert.AreEqual(1, m[1].StrokeID);
+    }
+
+    [Test]
+    public void PointTransform_Variants_Count()
+    {
+        var pts = MakeSquare(0, 0, 100);
+
+        // gốc, ±15, ±30 = 5; có lật = 10
+        Assert.AreEqual(10, PointTransform.Variants(pts, 30f, 15f, true).Count);
+        Assert.AreEqual(5, PointTransform.Variants(pts, 30f, 15f, false).Count);
+        Assert.AreEqual(1, PointTransform.Variants(pts, 0f, 15f, false).Count);
+        Assert.AreEqual("", PointTransform.Variants(pts, 30f, 15f, true)[0].suffix);
+    }
+
+    [Test]
+    public void AutoRotatedVariants_MatchTiltedDrawingBetter()
+    {
+        // Mẫu là một hình KHÔNG đối xứng xoay (chữ nhật 2:1), người chơi vẽ nghiêng 30°
+        var template = new List<Point>();
+        template.AddRange(MakeSquare(0, 0, 100));
+        for (int i = 0; i < template.Count; i++)
+            template[i] = new Point(template[i].X * 2f, template[i].Y, 0);
+        var tilted = new PointCloud("drawn", Rotate(template, 30f, 0, 0));
+
+        float single = _recognizer.Match(tilted, new PointCloud("t", template));
+
+        var clouds = new List<PointCloud>();
+        foreach (var (_, p) in PointTransform.Variants(template, 30f, 15f, false))
+            clouds.Add(new PointCloud("t", p));
+        float multi = _recognizer.MatchBest(tilted, clouds, out _);
+
+        Assert.Less(multi, single, "Có bản xoay 30° thì nét vẽ nghiêng phải khớp tốt hơn");
+        Assert.Less(multi, 0.01f, "Bản xoay đúng góc phải gần như trùng khớp");
+    }
 }

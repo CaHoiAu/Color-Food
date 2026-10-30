@@ -354,8 +354,9 @@ namespace ColorFood.Drawing
             PointCloud cloud = BuildPointCloud();
             if (cloud == null) return null;
 
-            float shape = recognizer.MatchBestScore(cloud, template.GetClouds(), template.maxDistance, out int best);
-            distance = recognizer.Match(cloud, template.GetClouds()[best]);
+            // Nguyên liệu có nhiều mẫu: so với tất cả, lấy mẫu giống nhất
+            distance = recognizer.MatchBest(cloud, template.GetClouds(), out _);
+            float shape = PDollarRecognizer.ScoreFromDistance(distance, template.maxDistance);
 
             return IngredientScorer.Score(shape, AnalyzeRegions(), _fill, palette.Table,
                                           template.shapeWeight, template.parts,

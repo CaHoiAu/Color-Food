@@ -40,6 +40,10 @@ namespace ColorFood.Data
     /// tiếp theo nằm trong extraVariants. Khi chấm điểm, nét vẽ được so với
     /// TẤT CẢ mẫu và lấy mẫu giống nhất — thêm mẫu không bao giờ làm điểm tụt.
     /// Mọi mẫu dùng chung maxDistance và luật bộ phận.
+    ///
+    /// GÓC ĐỘ: từ mỗi mẫu còn tự sinh bản xoay nghiêng / lật trái-phải
+    /// (autoRotateMax, autoRotateStep, autoMirror), nên không phải vẽ lại
+    /// cùng một hình ở nhiều góc.
     /// </summary>
     [CreateAssetMenu(menuName = "Color Food/Ingredient Template", fileName = "template_new")]
     public class IngredientTemplate : ScriptableObject
@@ -63,6 +67,18 @@ namespace ColorFood.Data
         [Tooltip("Mẫu 2, 3… — các cách vẽ khác của cùng nguyên liệu. " +
                  "Thêm bằng Template Recorder (Lưu → Thêm mẫu mới).")]
         public TemplateVariant[] extraVariants = new TemplateVariant[0];
+
+        [Header("Tự sinh góc độ (không cần vẽ lại)")]
+        [Tooltip("Từ mỗi mẫu tự sinh thêm bản xoay nghiêng tới ±góc này (độ). " +
+                 "0 = tắt. Đừng để quá lớn với hình có hướng rõ (tam giác đỉnh lên " +
+                 "xoay 180° thành đỉnh xuống).")]
+        [Range(0f, 90f)] public float autoRotateMax = 30f;
+
+        [Tooltip("Bước xoay (độ). 30 với bước 15 → thêm các góc ±15°, ±30°.")]
+        [Range(5f, 45f)] public float autoRotateStep = 15f;
+
+        [Tooltip("Tự sinh thêm bản lật trái ↔ phải (quả quay hướng ngược lại).")]
+        public bool autoMirror = true;
 
         [Header("Bộ phận và màu (bước 4)")]
         [Tooltip("Trọng số của điểm hình ($P) so với tổng trọng số các bộ phận.")]
@@ -131,18 +147,23 @@ namespace ColorFood.Data
         }
 
         /// <summary>
-        /// PointCloud đã chuẩn hóa của MỌI mẫu hợp lệ, tính MỘT LẦN rồi cache —
-        /// không chuẩn hóa lại mỗi lần chấm điểm. Mẫu rỗng bị bỏ qua, nên chỉ số
-        /// trong mảng này có thể khác chỉ số mẫu.
+        /// PointCloud đã chuẩn hóa của MỌI mẫu hợp lệ cùng các biến thể góc độ
+        /// tự sinh (xoay / lật), tính MỘT LẦN rồi cache — không chuẩn hóa lại mỗi
+        /// lần chấm điểm. Tên mỗi cloud cho biết nó từ mẫu nào, biến đổi gì
+        /// (ví dụ "tomato#2 lật xoay -15°"). Chỉ số trong mảng này KHÁC chỉ số mẫu.
         /// </summary>
         public IReadOnlyList<PointCloud> GetClouds()
         {
             if (_clouds != null) return _clouds;
 
-            var list = new List<PointCloud>(VariantCount);
+            var list = new List<PointCloud>();
             for (int i = 0; i < VariantCount; i++)
-                if (IsVariantValid(i))
-                    list.Add(new PointCloud(ingredientId + "#" + (i + 1), GetVariantPoints(i)));
+            {
+                if (!IsVariantValid(i)) continue;
+                foreach (var (suffix, points) in PointTransform.Variants(
+                             GetVariantPoints(i), autoRotateMax, autoRotateStep, autoMirror))
+                    list.Add(new PointCloud(ingredientId + "#" + (i + 1) + suffix, points));
+            }
             _clouds = list.ToArray();
             return _clouds;
         }
