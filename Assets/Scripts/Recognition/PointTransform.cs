@@ -40,7 +40,7 @@ namespace ColorFood.Recognition
             var angles = new List<float>();
             if (maxAngle > 0f && step > 0f)
             {
-                for (float a = -step; a <= maxAngle+1e-3f; a += step)
+                for (float a = step; a <= maxAngle+1e-3f; a += step)
                 {
                     angles.Add(a);
                     angles.Add(-a);

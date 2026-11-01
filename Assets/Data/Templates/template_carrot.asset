@@ -674,6 +674,9 @@ MonoBehaviour:
       StrokeID: 0
       ColorID: 0
     strokeCount: 1
+  autoRotateMax: 30
+  autoRotateStep: 15
+  autoMirror: 1
   shapeWeight: 0.4
   missingPartCap: 0.5
   minShape: 0.5

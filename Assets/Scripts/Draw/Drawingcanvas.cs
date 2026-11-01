@@ -14,9 +14,13 @@ namespace ColorFood.Drawing
     ///   3. Mặt nạ mực (_ink) và bản đồ màu (_fill) — để đóng nét, đếm vùng kín,
     ///      chấm màu từng bộ phận
     ///
-    /// Hai chế độ: Draw (kéo để vẽ nét) và Fill (bấm vào vùng kín để tô màu
-    /// đang chọn). Chỉ tô được VÙNG KÍN; bấm vào vùng hở thì màu rò ra ngoài
-    /// nên canvas từ chối (nét hở nhỏ hơn closeGapPixels được tự vá).
+    /// Ba chế độ, cả ba đều dùng MÀU ĐANG CHỌN trong palette:
+    ///   • Draw   — kéo để vẽ nét viền (nét đỏ cho quả dâu, nét xanh cho lá).
+    ///              Chỉ nét Draw mới vào point cloud ($P) và tạo vùng kín.
+    ///   • Crayon — kéo để tô như sáp màu: nét to, có vân giấy, tô lem ra ngoài
+    ///              cũng được. KHÔNG vào point cloud, không chặn vùng.
+    ///   • Fill   — bấm vào vùng kín để đổ đầy màu (thùng sơn). Chỉ tô được VÙNG
+    ///              KÍN; nét hở nhỏ hơn closeGapPixels được tự vá.
     ///
     /// Nên đặt một Image nền xám nhạt phía sau RawImage, nếu không màu trắng
     /// và kem tô lên nền trắng sẽ không nhìn thấy.
@@ -35,14 +39,21 @@ namespace ColorFood.Drawing
     [RequireComponent(typeof(RawImage))]
     public class DrawingCanvas : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler
     {
-        public enum Tool { Draw, Fill }
+        public enum Tool { Draw, Crayon, Fill }
 
         [Header("Kích thước canvas (pixel)")]
         [SerializeField] private int textureSize = 512;
 
         [Header("Bút vẽ")]
+        [Tooltip("Màu nét khi chưa gán palette. Có palette thì nét vẽ dùng màu đang chọn.")]
         [SerializeField] private Color brushColor = Color.black;
         [SerializeField, Range(1, 20)] private int brushRadius = 4;
+
+        [Header("Sáp màu")]
+        [SerializeField, Range(2, 40)] private int crayonRadius = 12;
+        [Tooltip("Tỉ lệ pixel để trống trong mỗi nét sáp (vân giấy). Chỉ để nhìn — " +
+                 "khi chấm điểm, cả vệt nét sáp được tính là đã tô.")]
+        [SerializeField, Range(0f, 0.8f)] private float crayonGrain = 0.3f;
 
         [Header("Lọc điểm")]
         [Tooltip("Hai điểm gần hơn khoảng này thì bỏ qua — giảm nhiễu khi vẽ chậm.")]
@@ -65,6 +76,7 @@ namespace ColorFood.Drawing
         private bool _dirty;
 
         private bool[] _ink;                // true = pixel có mực
+        private int[] _inkColor;            // ColorID của nét mực từng pixel, -1 = không có / không có palette
         private int[] _fill;                // ColorID từng pixel, -1 = chưa tô
 
         private readonly List<Point> _points = new List<Point>();
@@ -83,6 +95,9 @@ namespace ColorFood.Drawing
 
         /// <summary>ColorID từng pixel (-1 = chưa tô). Chỉ đọc — dùng để chấm điểm.</summary>
         public int[] FillIds => _fill;
+
+        /// <summary>ColorID nét viền từng pixel (-1 = không phải mực). Chỉ đọc — dùng để chấm điểm.</summary>
+        public int[] InkColorIds => _inkColor;
         public int TextureSize => textureSize;
 
         // ------------------------------------------------------------------
@@ -99,6 +114,7 @@ namespace ColorFood.Drawing
 
             _pixels = new Color32[textureSize * textureSize];
             _ink = new bool[textureSize * textureSize];
+            _inkColor = new int[textureSize * textureSize];
             _fill = new int[textureSize * textureSize];
             _image.texture = _texture;
 
@@ -131,6 +147,13 @@ namespace ColorFood.Drawing
             }
 
             _hasLastPos = false;
+            if (CurrentTool == Tool.Crayon)
+            {
+                CrayonDot(pos);
+                _lastCanvasPos = pos;
+                _hasLastPos = true;
+                return;
+            }
             AddPoint(pos);
         }
 
@@ -138,6 +161,15 @@ namespace ColorFood.Drawing
         {
             if (CurrentTool == Tool.Fill) return;
             if (!TryGetCanvasPosition(e, out Vector2 pos)) return;
+
+            if (CurrentTool == Tool.Crayon)
+            {
+                if (_hasLastPos) CrayonLine(_lastCanvasPos, pos);
+                else CrayonDot(pos);
+                _lastCanvasPos = pos;
+                _hasLastPos = true;
+                return;
+            }
 
             // Bỏ qua điểm quá gần điểm trước — giảm nhiễu và số điểm thừa
             if (_hasLastPos && Vector2.Distance(pos, _lastCanvasPos) < minPointDistance)
@@ -155,6 +187,7 @@ namespace ColorFood.Drawing
         {
             // Chế độ tô không tạo nét, nên không được tăng StrokeID
             if (CurrentTool == Tool.Fill) return;
+            if (CurrentTool == Tool.Crayon) { _hasLastPos = false; return; }
 
             // Nhấc bút = kết thúc một stroke
             _strokeId++;
@@ -163,7 +196,7 @@ namespace ColorFood.Drawing
 
         private void AddPoint(Vector2 canvasPos)
         {
-            _points.Add(new Point(canvasPos.x, canvasPos.y, _strokeId));
+            _points.Add(new Point(canvasPos.x, canvasPos.y, _strokeId, CurrentColorId));
             DrawDot(canvasPos);
 
             _lastCanvasPos = canvasPos;
@@ -202,7 +235,9 @@ namespace ColorFood.Drawing
             int cx = Mathf.RoundToInt(p.x);
             int cy = Mathf.RoundToInt(p.y);
             int r2 = brushRadius * brushRadius;
-            var c = (Color32)brushColor;
+            bool hasPalette = palette != null && palette.Count > 0;
+            var c = hasPalette ? palette.ColorOf(CurrentColorId) : (Color32)brushColor;
+            int colorId = hasPalette ? CurrentColorId : -1;
 
             for (int y = -brushRadius; y <= brushRadius; y++)
             {
@@ -213,11 +248,68 @@ namespace ColorFood.Drawing
                     int px = cx + x, py = cy + y;
                     if (px < 0 || px >= textureSize || py < 0 || py >= textureSize) continue;
 
-                    _pixels[py * textureSize + px] = c;
-                    _ink[py * textureSize + px] = true;
+                    int i = py * textureSize + px;
+                    _pixels[i] = c;
+                    _ink[i] = true;
+                    _inkColor[i] = colorId;
+                    _fill[i] = -1;     // nét viền đè lên chỗ đã tô: pixel này giờ là mực
                 }
             }
             _dirty = true;
+        }
+
+        /// <summary>
+        /// Một chấm sáp: ghi màu vào _fill cho cả vệt (để chấm điểm), nhưng chỉ
+        /// vẽ lên màn hình các pixel không rơi vào "vân giấy" — trông như sáp màu.
+        /// Không đè lên nét viền (mực), để viền luôn nhìn thấy.
+        /// </summary>
+        private void CrayonDot(Vector2 p)
+        {
+            if (palette == null || palette.Count == 0)
+            {
+                Debug.LogWarning("[DrawingCanvas] Chưa gán Palette nên không tô được.");
+                return;
+            }
+
+            int cx = Mathf.RoundToInt(p.x);
+            int cy = Mathf.RoundToInt(p.y);
+            int r2 = crayonRadius * crayonRadius;
+            Color32 c = palette.ColorOf(CurrentColorId);
+
+            for (int y = -crayonRadius; y <= crayonRadius; y++)
+            {
+                for (int x = -crayonRadius; x <= crayonRadius; x++)
+                {
+                    if (x * x + y * y > r2) continue;
+
+                    int px = cx + x, py = cy + y;
+                    if (px < 0 || px >= textureSize || py < 0 || py >= textureSize) continue;
+
+                    int i = py * textureSize + px;
+                    if (_ink[i]) continue;
+
+                    _fill[i] = CurrentColorId;
+                    if (Grain(px, py) >= crayonGrain) _pixels[i] = c;
+                }
+            }
+            _dirty = true;
+        }
+
+        private void CrayonLine(Vector2 a, Vector2 b)
+        {
+            float dist = Vector2.Distance(a, b);
+            int steps = Mathf.CeilToInt(dist / (crayonRadius * 0.5f));
+
+            for (int i = 1; i <= steps; i++)
+                CrayonDot(Vector2.Lerp(a, b, i / (float)steps));
+        }
+
+        /// <summary>Vân giấy: số giả ngẫu nhiên 0..1 cố định theo vị trí pixel.</summary>
+        private static float Grain(int x, int y)
+        {
+            uint h = (uint)(x * 374761393 + y * 668265263);
+            h = (h ^ (h >> 13)) * 1274126177u;
+            return ((h ^ (h >> 16)) & 0xFFFF) / 65535f;
         }
 
         /// <summary>Nối hai điểm bằng các chấm liên tiếp (Bresenham đơn giản hóa).</summary>
@@ -241,6 +333,7 @@ namespace ColorFood.Drawing
             {
                 _pixels[i] = transparent;
                 _ink[i] = false;
+                _inkColor[i] = -1;
                 _fill[i] = -1;
             }
 
@@ -362,7 +455,7 @@ namespace ColorFood.Drawing
                                           template.shapeWeight, template.parts,
                                           template.missingPartCap,
                                           template.minShape, template.shapeCap,
-                                          template.roundnessCap);
+                                          template.roundnessCap, _inkColor);
         }
 
         /// <summary>

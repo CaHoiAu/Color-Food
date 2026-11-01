@@ -30,6 +30,17 @@ namespace ColorFood.Recognition
         public string[] targetColors = new string[0];
 
         /// <summary>
+        /// Tỉ lệ diện tích bộ phận phải được TÔ (nét sáp) để không bị trừ điểm.
+        /// Tô bằng nét sáp không bao giờ phủ kín 100% (còn vệt trắng như tô màu
+        /// thật), nên tô được ≥ minCoverage diện tích là đủ; ít hơn thì điểm màu
+        /// giảm tuyến tính về 0. 0 = dùng mặc định 0.6 (asset cũ không có trường
+        /// này sẽ đọc ra 0).
+        /// </summary>
+        public float minCoverage = 0f;
+
+        public const float DefaultMinCoverage = 0.6f;
+
+        /// <summary>
         /// Độ tròn tối thiểu của đường bao (0 = không kiểm tra).
         /// circularity = 4π·Diện tích / Chu vi², hình tròn hình học lý tưởng = 1.
         ///
@@ -94,6 +105,22 @@ namespace ColorFood.Recognition
                 new PartRule { name = "yolk", role = PartRole.Inner, minCount = 1, maxCount = 1,
                                areaRatioMin = 0.05f, areaRatioMax = 0.25f,
                                targetColors = new[] { "yellow", "orange" }, minRoundness = 0.30f, weight = 0.4f }
+            };
+        }
+
+        /// <summary>
+        /// Thân một màu + chi tiết màu khác (dâu, táo, cà chua: thân đỏ, lá xanh).
+        /// Thân = vùng lớn nhất, chi tiết = mọi vùng còn lại (Main/Detail), nên lá
+        /// thò ra ngoài viền thân vẫn được tính đúng là chi tiết.
+        /// </summary>
+        public static PartRule[] BodyWithDetails(string[] bodyColors, string[] detailColors)
+        {
+            return new[]
+            {
+                new PartRule { name = "body", role = PartRole.Main, minCount = 1, maxCount = 1,
+                               targetColors = bodyColors, weight = 0.4f },
+                new PartRule { name = "details", role = PartRole.Detail, minCount = 1, maxCount = 0,
+                               targetColors = detailColors, weight = 0.2f }
             };
         }
 

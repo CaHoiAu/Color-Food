@@ -211,7 +211,7 @@ public class ColoringTests
             new Point(100,100,0), new Point(400,100,0), new Point(400,300,0),
             new Point(100,300,0), new Point(100,100,0)
         };
-        var wall = new List<Point> { new Point(250,100,1), new Point(250,300,1) };
+        var wall = new List<Point> { new Point(250, 100, 1), new Point(250, 300, 1) };
         var d = Draw(Concat(box, wall));
 
         Assert.IsTrue(FillAt(d, 170, 200, 5));
@@ -282,8 +282,8 @@ public class ColoringTests
     public void Regions_TinyOverlapHoles_AreIgnored()
     {
         // Hai nét cắt nhau tạo lỗ nhỏ xíu, không được tính là vùng
-        var a = new List<Point> { new Point(100,100,0), new Point(300,100,0) };
-        var b = new List<Point> { new Point(100,106,1), new Point(300,106,1) };
+        var a = new List<Point> { new Point(100, 100, 0), new Point(300, 100, 0) };
+        var b = new List<Point> { new Point(100, 106, 1), new Point(300, 106, 1) };
         var set = RegionAnalyzer.Analyze(Draw(Concat(a, b)).Barrier, W, H);
         Assert.AreEqual(0, set.Regions.Count);
     }
@@ -763,5 +763,121 @@ public class ColoringTests
 
         Assert.IsTrue(r.Capped);
         Assert.AreEqual(0.42f, r.Total, 0.0001f);
+    }
+
+    // ------------------------------------------------------------------
+    // Vẽ nét bằng màu + tô bằng sáp màu
+    // ------------------------------------------------------------------
+
+    private const int Red = 5, Green = 11, Blue = 15;
+
+    /// <summary>Tô kiểu sáp màu: chỉ phủ các cột x có (x % 10) &lt; per10 — còn vệt trắng.</summary>
+    private static void CrayonStripes(Drawing d, RegionSet regions, int colorId, int per10)
+    {
+        for (int p = 0; p < d.Fill.Length; p++)
+            if (regions.Labels[p] >= 0 && (p % W) % 10 < per10) d.Fill[p] = colorId;
+    }
+
+    private static int[] InkColors(Drawing d, int colorId)
+    {
+        var ink = new int[W * H];
+        for (int p = 0; p < ink.Length; p++) ink[p] = d.Ink[p] ? colorId : -1;
+        return ink;
+    }
+
+    [Test]
+    public void Crayon_PartialCoverage_AboveMin_GetsFullColor()
+    {
+        var d = Draw(Ellipse(256, 256, 150, 150));
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        CrayonStripes(d, regions, Red, 7);   // phủ ~70% ≥ mặc định 60%
+
+        var r = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f,
+                                       PartPresets.SingleBody("red"), 0.5f);
+        var body = r.PartResults[0];
+
+        Assert.AreEqual(0.7f, body.Coverage, 0.03f);
+        Assert.Greater(body.ColorScore, 0.95f, r.Report);
+    }
+
+    [Test]
+    public void Crayon_LowCoverage_LosesColorPoints()
+    {
+        var d = Draw(Ellipse(256, 256, 150, 150));
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        CrayonStripes(d, regions, Red, 3);   // phủ ~30% = một nửa mức 60%
+
+        var r = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f,
+                                       PartPresets.SingleBody("red"), 0.5f);
+
+        Assert.AreEqual(0.5f, r.PartResults[0].ColorScore, 0.07f, r.Report);
+    }
+
+    [Test]
+    public void MainDetail_LeafOutsideBody_IsDetail()
+    {
+        // Lá nằm hẳn trên thân: theo Outer/Inner nó là Outer (giống thân),
+        // theo Main/Detail nó là chi tiết.
+        var d = Draw(Concat(Ellipse(256, 220, 150, 150, 0), Ellipse(256, 420, 40, 25, 1)));
+        Assert.IsTrue(FillAt(d, 256, 220, Red));
+        Assert.IsTrue(FillAt(d, 256, 420, Green));
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+
+        var rules = PartPresets.BodyWithDetails(new[] { "red" }, new[] { "green" });
+        var r = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f, rules, 0.5f);
+
+        Assert.AreEqual(1, r.PartResults[0].Count, "thân = đúng 1 vùng lớn nhất");
+        Assert.AreEqual(1, r.PartResults[1].Count, "lá = vùng còn lại");
+        Assert.Greater(r.PartResults[0].ColorScore, 0.95f, r.Report);
+        Assert.Greater(r.PartResults[1].ColorScore, 0.95f, r.Report);
+        Assert.Greater(r.Total, 0.95f, r.Report);
+    }
+
+    [Test]
+    public void MainDetail_LeafWrongColor_IsLow()
+    {
+        var d = Draw(Concat(Ellipse(256, 220, 150, 150, 0), Ellipse(256, 420, 40, 25, 1)));
+        FillAt(d, 256, 220, Red);
+        FillAt(d, 256, 420, Red);   // lá tô đỏ
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+
+        var rules = PartPresets.BodyWithDetails(new[] { "red" }, new[] { "green" });
+        var r = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f, rules, 0.5f);
+
+        Assert.Less(r.PartResults[1].ColorScore, 0.3f, r.Report);
+    }
+
+    [Test]
+    public void OutlineColor_CountsTowardsColorAccuracy()
+    {
+        var d = Draw(Ellipse(256, 256, 150, 150));
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        CrayonStripes(d, regions, Red, 7);
+        var rules = PartPresets.SingleBody("red");
+
+        var redLine = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f, rules, 0.5f,
+                                             0f, 0.5f, 0.5f, InkColors(d, Red));
+        var blueLine = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f, rules, 0.5f,
+                                              0f, 0.5f, 0.5f, InkColors(d, Blue));
+
+        Assert.Greater(redLine.PartResults[0].ColorAccuracy, 0.95f, redLine.Report);
+        Assert.Less(blueLine.PartResults[0].ColorAccuracy, redLine.PartResults[0].ColorAccuracy);
+    }
+
+    [Test]
+    public void Crayon_SpillOutside_IsReported()
+    {
+        var d = Draw(Ellipse(256, 256, 100, 100));
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        CrayonStripes(d, regions, Red, 10);
+        for (int y = 20; y < 60; y++)            // một vệt tô lem ngoài hình
+            for (int x = 20; x < 120; x++) d.Fill[y * W + x] = Red;
+
+        var r = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f,
+                                       PartPresets.SingleBody("red"), 0.5f, 0f, 0.5f, 0.5f,
+                                       InkColors(d, Red));
+
+        Assert.Greater(r.Spill, 0.05f);
+        Assert.Less(r.Spill, 0.5f);
     }
 }

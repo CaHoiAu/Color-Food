@@ -18,7 +18,8 @@ namespace ColorFood.Drawing
     ///   1. Gắn vào một GameObject rỗng; kéo DrawingCanvas và các IngredientTemplate
     ///      vào ô tương ứng. Palette gán cho DrawingCanvas (tester tự lấy từ đó).
     ///   2. Play. Chọn nguyên liệu bằng phím 1–9.
-    ///   3. D = chế độ vẽ, F = chế độ tô. Chọn màu bằng ô màu bên trái hoặc phím [ ].
+    ///   3. Chọn màu bằng ô màu bên trái hoặc phím [ ] — màu dùng cho CẢ nét vẽ lẫn tô.
+    ///      D = vẽ nét viền, F = tô sáp màu (kéo), G = thùng sơn (bấm vào vùng kín).
     ///   4. ENTER = chấm điểm + ghi CSV. C = xóa canvas, không ghi.
     ///
     /// Màu và nút bấm vẽ bằng IMGUI (OnGUI) để khỏi phải dựng UI trong scene;
@@ -71,7 +72,8 @@ namespace ColorFood.Drawing
                 return;
             }
 
-            canvas.SetColor(0);
+            // Bắt đầu bằng màu tối nhất (màu 0 thường là trắng — vẽ nét trắng sẽ không thấy)
+            canvas.SetColor(DarkestColor());
             PrepareCsv();
 
             var keys = new StringBuilder();
@@ -91,7 +93,7 @@ namespace ColorFood.Drawing
             }
 
             Debug.Log("[ColoringTester] Sẵn sàng. Phím nguyên liệu:" + keys +
-                      "\nD = vẽ, F = tô, [ ] = đổi màu, ENTER = chấm điểm, C = xóa.\n" +
+                      "\nD = vẽ nét, F = tô sáp màu, G = thùng sơn, [ ] = đổi màu, ENTER = chấm điểm, C = xóa.\n" +
                       $"File CSV: {_csvPath}");
         }
 
@@ -101,7 +103,8 @@ namespace ColorFood.Drawing
                 if (Input.GetKeyDown(KeyCode.Alpha1 + i)) Select(i);
 
             if (Input.GetKeyDown(KeyCode.D)) canvas.SetTool(DrawingCanvas.Tool.Draw);
-            if (Input.GetKeyDown(KeyCode.F)) canvas.SetTool(DrawingCanvas.Tool.Fill);
+            if (Input.GetKeyDown(KeyCode.F)) canvas.SetTool(DrawingCanvas.Tool.Crayon);
+            if (Input.GetKeyDown(KeyCode.G)) canvas.SetTool(DrawingCanvas.Tool.Fill);
 
             if (Input.GetKeyDown(KeyCode.LeftBracket))
                 canvas.SetColor((canvas.CurrentColorId + palette.Count - 1) % palette.Count);
@@ -110,6 +113,19 @@ namespace ColorFood.Drawing
 
             if (Input.GetKeyDown(KeyCode.Return)) ScoreNow();
             if (Input.GetKeyDown(KeyCode.C)) { canvas.Clear(); _lastReport = ""; }
+        }
+
+        private int DarkestColor()
+        {
+            int best = 0;
+            float bestLum = float.MaxValue;
+            for (int i = 0; i < palette.Count; i++)
+            {
+                Color32 c = palette.ColorOf(i);
+                float lum = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
+                if (lum < bestLum) { bestLum = lum; best = i; }
+            }
+            return best;
         }
 
         private void Select(int i)
@@ -207,15 +223,19 @@ namespace ColorFood.Drawing
             int rows = (palette.Count + cols - 1) / cols;
             float y = 10 + rows * (h + pad) + 10;
 
-            bool drawing = canvas.CurrentTool == DrawingCanvas.Tool.Draw;
-            if (GUI.Toggle(new Rect(10, y, 150, 26), drawing, " Draw (D)", "Button") && !drawing)
-                canvas.SetTool(DrawingCanvas.Tool.Draw);
-            if (GUI.Toggle(new Rect(10, y + 30, 150, 26), !drawing, " Fill (F)", "Button") && drawing)
-                canvas.SetTool(DrawingCanvas.Tool.Fill);
+            ToolButton(new Rect(10, y, 150, 26), DrawingCanvas.Tool.Draw, " Draw (D)");
+            ToolButton(new Rect(10, y + 30, 150, 26), DrawingCanvas.Tool.Crayon, " Crayon (F)");
+            ToolButton(new Rect(10, y + 60, 150, 26), DrawingCanvas.Tool.Fill, " Bucket (G)");
 
             var t = Current;
-            GUI.Label(new Rect(10, y + 66, 260, 22), "Ingredient: " + (t != null ? t.ingredientId : "-"));
-            GUI.Label(new Rect(10, y + 86, 300, 22), _lastReport);
+            GUI.Label(new Rect(10, y + 96, 260, 22), "Ingredient: " + (t != null ? t.ingredientId : "-"));
+            GUI.Label(new Rect(10, y + 116, 300, 22), _lastReport);
+        }
+
+        private void ToolButton(Rect rect, DrawingCanvas.Tool tool, string label)
+        {
+            bool on = canvas.CurrentTool == tool;
+            if (GUI.Toggle(rect, on, label, "Button") && !on) canvas.SetTool(tool);
         }
     }
 }

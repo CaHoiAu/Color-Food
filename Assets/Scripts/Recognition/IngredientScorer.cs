@@ -19,6 +19,10 @@ namespace ColorFood.Recognition
         /// <summary>Độ gai đo được (chỉ có khi luật có maxSpikiness &gt; 0).</summary>
         public float Spikiness;
         public float ColorScore;
+        /// <summary>Tỉ lệ diện tích nhóm vùng đã được tô (0..1).</summary>
+        public float Coverage;
+        /// <summary>Độ đúng màu trung bình trên phần đã tô + nét viền (0..1), chưa tính độ phủ.</summary>
+        public float ColorAccuracy;
         public float Score;
         public bool Missing;
     }
@@ -37,6 +41,11 @@ namespace ColorFood.Recognition
         public float OuterCircularity, InnerCircularity;
         /// <summary>Độ gai (trung bình theo diện tích) của nhóm vùng Outer / Inner — để ghi log.</summary>
         public float OuterSpikiness, InnerSpikiness;
+        // <summary>
+        /// Tỉ lệ màu tô LEM ra ngoài mọi vùng kín (pixel tô nằm ngoài vùng / tổng
+        /// pixel đã tô). Chỉ để báo cáo, không trừ điểm.
+        /// </summary>
+        public float Spill;
         public List<PartResult> PartResults = new List<PartResult>();
         public string Report = "";
     }
@@ -66,6 +75,14 @@ namespace ColorFood.Recognition
     /// là một điều kiện CHẶN TRẦN độc lập, không phụ thuộc trọng số riêng của
     /// bộ phận đó. Ba điều kiện (thiếu bộ phận / hình quá tệ / outline không đủ
     /// tròn) độc lập, cùng áp dụng một lượt, cap thấp nhất thắng.
+    /// 
+    /// MÀU (người chơi vẽ nét bằng màu, tô bằng nét sáp):
+    ///   colorScore = độ đúng màu × hệ số độ phủ
+    ///   độ đúng màu = trung bình độ giống trên các pixel ĐÃ TÔ trong nhóm vùng
+    ///                 + các pixel NÉT VIỀN giáp nhóm vùng (nếu có inkColorIds)
+    ///   độ phủ      = pixel đã tô / diện tích nhóm; đạt minCoverage là đủ
+    /// Tô kín bằng thùng sơn (độ phủ 100%, không có màu viền) cho kết quả giống
+    /// hệt công thức cũ (tổng độ giống / diện tích).
     /// </summary>
     public static class IngredientScorer
     {
@@ -73,7 +90,7 @@ namespace ColorFood.Recognition
                                         ColorTable colors, float shapeWeight,
                                         IReadOnlyList<PartRule> rules, float missingCap,
                                         float minShape = 0f, float shapeCap = 0.5f,
-                                        float roundnessCap = 0.5f)
+                                        float roundnessCap = 0.5f, int[] inkColorIds = null)
         {
             var result = new ScoreResult { Shape = Clamp01(shapeScore) };
             var report = new StringBuilder();
@@ -115,13 +132,29 @@ namespace ColorFood.Recognition
             int k = colors.Count;
             var hist = new int[regions.Regions.Count][];
             for (int i = 0; i < hist.Length; i++) hist[i] = new int[k + 1];
+            int paintedTotal = 0, paintedOutside = 0;
             for (int p = 0; p < regions.Labels.Length; p++)
             {
-                int lab = regions.Labels[p];
-                if (lab < 0) continue;
                 int fid = fillIds[p];
+                bool painted = fid >= 0 && fid < k;
+                int lab = regions.Labels[p];
+                if (painted && (inkColorIds == null || inkColorIds[p] < 0))
+                {
+                    paintedTotal++;
+                    if (lab < 0) paintedOutside++;
+                }
+                if (lab < 0) continue;
                 hist[lab][(fid >= 0 && fid < k) ? fid + 1 : 0]++;
             }
+            result.Spill = paintedTotal > 0 ? paintedOutside / (float)paintedTotal : 0f;
+
+            // Màu nét viền: mỗi pixel mực có màu được tính cho MỌI vùng nó giáp (4 hướng)
+            int[][] inkHist = inkColorIds!=null ? InkHistogram(regions, inkColorIds, k) : null;
+
+            // Vùng lớn nhất — cho luật Main / Detail
+            int largestId = -1;
+            foreach (var r in regions.Regions)
+                if (largestId < 0 || r.Area > regions.Regions[largestId].Area) largestId = r.Id;
 
             float weightSum = shapeWeight;
             float weighted = shapeWeight * result.Shape;
@@ -187,7 +220,7 @@ namespace ColorFood.Recognition
                     }
                 }
 
-                // Màu: trung bình độ giống trên TỪNG pixel của nhóm (chưa tô = 0)
+                // Màu: độ đúng màu (phần đã tô + nét viền) × hệ số độ phủ
                 pr.ColorScore = 1f;
                 if (rule.targetColors != null && rule.targetColors.Length > 0)
                 {
@@ -199,21 +232,30 @@ namespace ColorFood.Recognition
                         else report.AppendLine("  ! Không có màu '" + t + "' trong palette");
                     }
 
-                    double sum = 0; int area = 0;
+                    double sum = 0; int painted = 0; int area = 0;
                     foreach (var r in groupRegions)
                     {
                         for (int c = 1; c <= k; c++)
                         {
-                            int cnt = hist[r.Id][c];
+                            int cnt = hist[r.Id][c]+(inkHist != null ? inkHist[r.Id][c] : 0);
                             if (cnt == 0) continue;
                             float best = 0f;
                             foreach (int tid in targets)
                                 best = Math.Max(best, colors.Similarity(c - 1, tid));
                             sum += best * cnt;
+                            painted += cnt;
                         }
                         area += r.Area;
                     }
-                    pr.ColorScore = area > 0 ? (float)(sum / area) : 0f;
+
+                    int filled = 0;
+                    foreach (var r in groupRegions)
+                        for (int c = 1; c <= k; c++) filled += hist[r.Id][c];
+
+                    float minCoverage = rule.minCoverage > 0f? rule.minCoverage : PartRule.DefaultMinCoverage;
+                    pr.ColorAccuracy = painted > 0 ? (float)(sum / painted) : 1f;
+                    pr.Coverage = area > 0 ? filled / (float)area : 0f;
+                    pr.ColorScore = pr.ColorAccuracy * Clamp01(pr.Coverage / minCoverage);
                 }
 
                 pr.Score = pr.CountFactor * pr.AreaFactor * pr.RoundnessFactor * pr.SpikeFactor * pr.ColorScore;
@@ -227,6 +269,9 @@ namespace ColorFood.Recognition
 
                 report.AppendLine("  " + rule.name + ": " + pr.Count + " vùng, diện tích " + Pct(pr.AreaRatio) +
                                   ", màu " + Pct(pr.ColorScore) +
+                                  (rule.targetColors != null && rule.targetColors.Length > 0
+                                      ? " (đúng màu " + Pct(pr.ColorAccuracy) + ", tô phủ " + Pct(pr.Coverage) + ")"
+                                      : "") +
                                   (pr.AreaFactor < 1f ? ", diện tích lệch (" + Pct(pr.AreaFactor) + ")" : "") +
                                   (rule.minRoundness > 0f
                                       ? ", độ tròn " + Pct(pr.RoundnessFactor) +
@@ -240,6 +285,9 @@ namespace ColorFood.Recognition
                                   " → " + Pct(pr.Score) + (pr.Missing ? "  THIẾU" : ""));
                 result.PartResults.Add(pr);
             }
+
+            if (result.Spill > 0.05f)
+                report.AppendLine("  Tô lem ra ngoài: " + Pct(result.Spill) + " (không trừ điểm)");
 
             result.Parts = partWeightSum > 0f ? partWeighted / partWeightSum : 1f;
             float total = weightSum > 0f ? weighted / weightSum : result.Shape;
@@ -268,6 +316,47 @@ namespace ColorFood.Recognition
             result.Total = Clamp01(total);
             result.Report = report.ToString();
             return result;
+        }
+        private static bool InGroup(Region r, PartRole role, int largestId)
+        {
+            switch (role)
+            {
+                case PartRole.Main: return r.Id == largestId;
+                case PartRole.Detail: return r.Id != largestId;
+                default: return r.Role == role;
+            }
+        }
+
+        /// <summary>[vùng][id+1 = màu id]: số pixel mực màu đó giáp vùng.</summary>
+        private static int[][] InkHistogram(RegionSet regions, int[] inkColorIds, int k)
+        {
+            int w = regions.Width, h = regions.Height;
+            var hist = new int[regions.Regions.Count][];
+            for (int i = 0; i < hist.Length; i++) hist[i] = new int[k + 1];
+
+            var seen = new int[4];
+            for (int p = 0; p < inkColorIds.Length; p++)
+            {
+                int cid = inkColorIds[p];
+                if (cid < 0 || cid >= k) continue;
+                int y = p / w, x = p - y * w;
+
+                int n = 0;
+                if (x > 0) AddNeighbor(regions.Labels[p - 1], seen, ref n);
+                if (x < w - 1) AddNeighbor(regions.Labels[p + 1], seen, ref n);
+                if (y > 0) AddNeighbor(regions.Labels[p - w], seen, ref n);
+                if (y < h - 1) AddNeighbor(regions.Labels[p + w], seen, ref n);
+
+                for (int i = 0; i < n; i++) hist[seen[i]][cid + 1]++;
+            }
+            return hist;
+        }
+
+        private static void AddNeighbor(int label, int[] seen, ref int n)
+        {
+            if (label < 0) return;
+            for (int i = 0; i < n; i++) if (seen[i] == label) return;
+            seen[n++] = label;
         }
 
         /// <summary>1 nếu nằm trong [min,max]; giảm dần tuyến tính khi lệch ra ngoài.</summary>

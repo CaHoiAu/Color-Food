@@ -8,7 +8,17 @@ namespace ColorFood.Recognition
         /// <summary>Vùng không nằm trong vùng nào khác (thân, lòng trắng...).</summary>
         Outer,
         /// <summary>Vùng nằm bên trong một vùng khác (lòng đỏ, hạt...).</summary>
-        Inner
+        Inner,
+        /// <summary>
+        /// CHỈ DÙNG TRONG LUẬT (PartRule): vùng có diện tích LỚN NHẤT (thân quả).
+        /// Vùng thật luôn được gán Outer/Inner; Main/Detail chọn vùng theo diện tích.
+        /// </summary>
+        Main,
+        /// <summary>
+        /// CHỈ DÙNG TRONG LUẬT: mọi vùng TRỪ vùng lớn nhất (lá, cuống, đốm) — dù
+        /// nằm trong hay thò ra ngoài thân, khác với Inner.
+        /// </summary>
+        Detail
     }
 
     public class Region
@@ -80,9 +90,15 @@ namespace ColorFood.Recognition
 
                 if (touches || pixels.Count < minArea) continue;
 
-                var r = new Region { Id = set.Regions.Count, Area = pixels.Count,
-                                     MinX = int.MaxValue, MinY = int.MaxValue,
-                                     MaxX = int.MinValue, MaxY = int.MinValue };
+                var r = new Region
+                {
+                    Id = set.Regions.Count,
+                    Area = pixels.Count,
+                    MinX = int.MaxValue,
+                    MinY = int.MaxValue,
+                    MaxX = int.MinValue,
+                    MaxY = int.MinValue
+                };
                 double sx = 0, sy = 0;
                 foreach (int p in pixels)
                 {

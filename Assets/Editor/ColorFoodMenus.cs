@@ -10,6 +10,7 @@ namespace ColorFood.EditorTools
     ///   Color Food → Create Default Palette
     ///   Color Food → Presets → Fried Egg Parts (selected template)
     ///   Color Food → Presets → Single Body Part (selected template)
+    ///   Color Food → Presets → Red Body + Green Leaves (selected template)
     /// </summary>
     public static class ColorFoodMenus
     {
@@ -48,6 +49,15 @@ namespace ColorFood.EditorTools
         {
             // Màu để trống: nhập tên màu trong Inspector (ví dụ red, dark red)
             Apply(PartPresets.SingleBody(), "Single Body");
+        }
+
+        [MenuItem("Color Food/Presets/Red Body + Green Leaves (selected template)")]
+        public static void ApplyRedBodyGreenLeaves()
+        {
+            // Dâu, táo, cà chua, anh đào: thân = vùng lớn nhất, lá/cuống = các vùng còn lại
+            Apply(PartPresets.BodyWithDetails(new[] { "red", "dark red", "orange" },
+                                              new[] { "green", "dark green", "light green" }),
+                  "Red Body + Green Leaves");
         }
 
         private static void Apply(PartRule[] rules, string label)
