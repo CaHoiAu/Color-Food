@@ -794,10 +794,39 @@ MonoBehaviour:
       StrokeID: 0
       ColorID: 0
     strokeCount: 1
+  autoRotateMax: 30
+  autoRotateStep: 15
+  autoMirror: 1
   shapeWeight: 0.4
   missingPartCap: 0.5
   minShape: 0.5
   shapeCap: 0.5
   roundnessCap: 0.5
-  parts: []
+  parts:
+  - name: body
+    role: 2
+    minCount: 1
+    maxCount: 1
+    areaRatioMin: 0
+    areaRatioMax: 0
+    targetColors:
+    - red
+    minCoverage: 0
+    minRoundness: 0
+    maxSpikiness: 0
+    weight: 0.4
+  - name: details
+    role: 3
+    minCount: 1
+    maxCount: 0
+    areaRatioMin: 0
+    areaRatioMax: 0
+    targetColors:
+    - green
+    - dark green
+    - light green
+    minCoverage: 0
+    minRoundness: 0
+    maxSpikiness: 0
+    weight: 0.2
   notes: 

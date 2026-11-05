@@ -17,8 +17,10 @@ namespace ColorFood.Drawing
     /// Ba chế độ, cả ba đều dùng MÀU ĐANG CHỌN trong palette:
     ///   • Draw   — kéo để vẽ nét viền (nét đỏ cho quả dâu, nét xanh cho lá).
     ///              Chỉ nét Draw mới vào point cloud ($P) và tạo vùng kín.
-    ///   • Crayon — kéo để tô như sáp màu: nét to, có vân giấy, tô lem ra ngoài
-    ///              cũng được. KHÔNG vào point cloud, không chặn vùng.
+    ///   • Crayon — sáp màu dùng cho CẢ viền lẫn tô (như tô màu thật). Nét to, có
+    ///              vân giấy. Nhấc tay thì tự đoán (StrokeClassifier): nét nằm trong
+    ///              một vùng kín và cùng màu viền vùng đó = NÉT TÔ (không vào $P,
+    ///              không chặn vùng); còn lại = NÉT VIỀN (vào $P, tạo vùng kín).
     ///   • Fill   — bấm vào vùng kín để đổ đầy màu (thùng sơn). Chỉ tô được VÙNG
     ///              KÍN; nét hở nhỏ hơn closeGapPixels được tự vá.
     ///
@@ -50,9 +52,9 @@ namespace ColorFood.Drawing
         [SerializeField, Range(1, 20)] private int brushRadius = 4;
 
         [Header("Sáp màu")]
-        [SerializeField, Range(2, 40)] private int crayonRadius = 12;
+        [SerializeField, Range(2, 40)] private int crayonRadius = 8;
         [Tooltip("Tỉ lệ pixel để trống trong mỗi nét sáp (vân giấy). Chỉ để nhìn — " +
-                 "khi chấm điểm, cả vệt nét sáp được tính là đã tô.")]
+                 "khi chấm điểm, cả vệt nét sáp được tính là đã tô / là viền.")]
         [SerializeField, Range(0f, 0.8f)] private float crayonGrain = 0.3f;
 
         [Header("Lọc điểm")]
@@ -83,6 +85,23 @@ namespace ColorFood.Drawing
         private int _strokeId;
         private Vector2 _lastCanvasPos;
         private bool _hasLastPos;
+
+        private readonly List<Point> _crayonStroke = new List<Point>();   // nét sáp đang kéo
+        private RegionSet _regions;          // vùng kín của các nét viền hiện có (cache)
+        private bool[] _regionsBarrier;
+        private int[][] _regionOutlineColors;
+        private bool _regionsDirty = true;
+
+        /// <summary>Một thao tác, theo đúng thứ tự — để dựng lại dữ liệu chấm điểm sau khi xét lại.</summary>
+        private class CanvasEvent
+        {
+            public DrawnStroke Stroke;     // nét bút / nét sáp
+            public int[] BucketPixels;     // hoặc một lần đổ thùng sơn
+            public int ColorId;
+        }
+        private readonly List<CanvasEvent> _events = new List<CanvasEvent>();
+        private DrawnStroke _penStroke;    // nét bút đang kéo
+        private bool _needsReconcile;      // có nét sáp đang là viền → nên xét lại trước khi chấm
 
         /// <summary>Point cloud thô của nét vẽ hiện tại. Rỗng nếu chưa vẽ gì.</summary>
         public IReadOnlyList<Point> RawPoints => _points;
@@ -149,11 +168,16 @@ namespace ColorFood.Drawing
             _hasLastPos = false;
             if (CurrentTool == Tool.Crayon)
             {
-                CrayonDot(pos);
-                _lastCanvasPos = pos;
-                _hasLastPos = true;
+                _crayonStroke.Clear();
+                AddCrayonPoint(pos);
                 return;
             }
+            _penStroke = new DrawnStroke
+            {
+                Radius = brushRadius,
+                Auto = false,
+                ColorId = HasPalette ? CurrentColorId : -1
+            };
             AddPoint(pos);
         }
 
@@ -162,18 +186,15 @@ namespace ColorFood.Drawing
             if (CurrentTool == Tool.Fill) return;
             if (!TryGetCanvasPosition(e, out Vector2 pos)) return;
 
-            if (CurrentTool == Tool.Crayon)
-            {
-                if (_hasLastPos) CrayonLine(_lastCanvasPos, pos);
-                else CrayonDot(pos);
-                _lastCanvasPos = pos;
-                _hasLastPos = true;
-                return;
-            }
-
             // Bỏ qua điểm quá gần điểm trước — giảm nhiễu và số điểm thừa
             if (_hasLastPos && Vector2.Distance(pos, _lastCanvasPos) < minPointDistance)
                 return;
+
+            if (CurrentTool == Tool.Crayon)
+            {
+                AddCrayonPoint(pos);
+                return;
+            }
 
             // Nội suy giữa hai frame: nếu máy lag hoặc kéo nhanh, khoảng cách
             // giữa hai frame có thể lớn, để nguyên thì nét vẽ bị đứt đoạn.
@@ -187,16 +208,139 @@ namespace ColorFood.Drawing
         {
             // Chế độ tô không tạo nét, nên không được tăng StrokeID
             if (CurrentTool == Tool.Fill) return;
-            if (CurrentTool == Tool.Crayon) { _hasLastPos = false; return; }
+            if (CurrentTool == Tool.Crayon)
+            {
+                CommitCrayonStroke();
+                _hasLastPos = false;
+                return;
+            }
 
             // Nhấc bút = kết thúc một stroke
             _strokeId++;
             _hasLastPos = false;
+            _regionsDirty = true;
+            if (_penStroke != null && _penStroke.Points.Count > 0)
+                _events.Add(new CanvasEvent { Stroke = _penStroke, ColorId = _penStroke.ColorId });
+            _penStroke = null;
+        }
+
+        private bool HasPalette => palette != null && palette.Count > 0;
+
+        private void AddCrayonPoint(Vector2 pos)
+        {
+            if (palette == null || palette.Count == 0)
+            {
+                Debug.LogWarning("[DrawingCanvas] Chưa gán Palette nên không tô được.");
+                return;
+            }
+
+            if (_hasLastPos) CrayonLine(_lastCanvasPos, pos);
+            else CrayonDot(pos);
+
+            _crayonStroke.Add(new Point(pos.x, pos.y, _strokeId, CurrentColorId));
+            _lastCanvasPos = pos;
+            _hasLastPos = true;
+        }
+
+        /// <summary>
+        /// Nhấc tay khỏi nét sáp: đoán viền hay tô rồi ghi vào đúng chỗ.
+        ///   Tô  → _fill (để chấm màu), không đụng point cloud / vùng kín.
+        ///   Viền → point cloud ($P) + mặt nạ mực (tạo vùng kín, màu viền).
+        /// </summary>
+        private void CommitCrayonStroke()
+        {
+            if (_crayonStroke.Count == 0) return;
+
+            bool isFill = false;
+            if (_points.Count > 0)
+            {
+                if (_regionsDirty)
+                {
+                    _regionsBarrier = BuildBarrier(out _);
+                    _regions = RegionAnalyzer.Analyze(_regionsBarrier, textureSize, textureSize, minRegionArea);
+                    _regionOutlineColors = StrokeClassifier.RegionOutlineColors(_regions, _inkColor, palette.Count);
+                    _regionsDirty = false;
+                }
+                isFill = StrokeClassifier.IsFill(_crayonStroke, CurrentColorId, _regions,
+                                                 _regionOutlineColors, palette.Table,
+                                                 barrier: _regionsBarrier);
+            }
+
+            StampStroke(_crayonStroke, !isFill, crayonRadius, CurrentColorId);
+            if (!isFill)
+            {
+                _points.AddRange(_crayonStroke);
+                _strokeId++;
+                _regionsDirty = true;
+                _needsReconcile = true;
+            }
+
+            _events.Add(new CanvasEvent
+            {
+                ColorId = CurrentColorId,
+                Stroke = new DrawnStroke
+                {
+                    Points = new List<Point>(_crayonStroke),
+                    ColorId = CurrentColorId,
+                    Radius = crayonRadius,
+                    IsFill = isFill,
+                    Auto = true
+                }
+            });
+
+            if (logOnEvaluate)
+                Debug.Log($"[DrawingCanvas] Nét sáp {palette.NameOf(CurrentColorId)} → {(isFill ? "TÔ" : "VIỀN")}");
+            _crayonStroke.Clear();
+        }
+
+        /// <summary>Ghi cả vệt nét vào mặt nạ mực (asInk) hoặc bản đồ màu tô. Không vẽ lên màn hình.</summary>
+        private void StampStroke(List<Point> stroke, bool asInk, int radius, int colorId)
+        {
+            StampDisc(stroke[0].X, stroke[0].Y, asInk, radius, colorId);
+            for (int k = 1; k < stroke.Count; k++)
+            {
+                var a = new Vector2(stroke[k - 1].X, stroke[k - 1].Y);
+                var b = new Vector2(stroke[k].X, stroke[k].Y);
+                int steps = Mathf.CeilToInt(Vector2.Distance(a, b) / Mathf.Max(1f, radius * 0.5f));
+                for (int i = 1; i <= steps; i++)
+                {
+                    Vector2 p = Vector2.Lerp(a, b, i / (float)steps);
+                    StampDisc(p.x, p.y, asInk, radius, colorId);
+                }
+            }
+        }
+
+        private void StampDisc(float fx, float fy, bool asInk, int radius, int colorId)
+        {
+            int cx = Mathf.RoundToInt(fx), cy = Mathf.RoundToInt(fy);
+            int r2 = radius * radius;
+
+            for (int y = -radius; y <= radius; y++)
+            {
+                for (int x = -radius; x <= radius; x++)
+                {
+                    if (x * x + y * y > r2) continue;
+
+                    int px = cx + x, py = cy + y;
+                    if (px < 0 || px >= textureSize || py < 0 || py >= textureSize) continue;
+
+                    int i = py * textureSize + px;
+                    if (asInk)
+                    {
+                        _ink[i] = true;
+                        _inkColor[i] = colorId;
+                        _fill[i] = -1;
+                    }
+                    else if (!_ink[i]) _fill[i] = colorId;
+                }
+            }
         }
 
         private void AddPoint(Vector2 canvasPos)
         {
-            _points.Add(new Point(canvasPos.x, canvasPos.y, _strokeId, CurrentColorId));
+            var point = new Point(canvasPos.x, canvasPos.y, _strokeId, CurrentColorId);
+            _points.Add(point);
+            _penStroke?.Points.Add(point);
             DrawDot(canvasPos);
 
             _lastCanvasPos = canvasPos;
@@ -259,18 +403,11 @@ namespace ColorFood.Drawing
         }
 
         /// <summary>
-        /// Một chấm sáp: ghi màu vào _fill cho cả vệt (để chấm điểm), nhưng chỉ
-        /// vẽ lên màn hình các pixel không rơi vào "vân giấy" — trông như sáp màu.
-        /// Không đè lên nét viền (mực), để viền luôn nhìn thấy.
+        /// Một chấm sáp CHỈ ĐỂ NHÌN: vẽ lên màn hình các pixel không rơi vào "vân
+        /// giấy". Việc ghi vào mặt nạ mực / bản đồ màu làm lúc nhấc tay (CommitCrayonStroke).
         /// </summary>
         private void CrayonDot(Vector2 p)
         {
-            if (palette == null || palette.Count == 0)
-            {
-                Debug.LogWarning("[DrawingCanvas] Chưa gán Palette nên không tô được.");
-                return;
-            }
-
             int cx = Mathf.RoundToInt(p.x);
             int cy = Mathf.RoundToInt(p.y);
             int r2 = crayonRadius * crayonRadius;
@@ -285,11 +422,7 @@ namespace ColorFood.Drawing
                     int px = cx + x, py = cy + y;
                     if (px < 0 || px >= textureSize || py < 0 || py >= textureSize) continue;
 
-                    int i = py * textureSize + px;
-                    if (_ink[i]) continue;
-
-                    _fill[i] = CurrentColorId;
-                    if (Grain(px, py) >= crayonGrain) _pixels[i] = c;
+                    if (Grain(px, py) >= crayonGrain) _pixels[py * textureSize + px] = c;
                 }
             }
             _dirty = true;
@@ -338,8 +471,13 @@ namespace ColorFood.Drawing
             }
 
             _points.Clear();
+            _crayonStroke.Clear();
+            _events.Clear();
+            _penStroke = null;
+            _needsReconcile = false;
             _strokeId = 0;
             _hasLastPos = false;
+            _regionsDirty = true;
             _dirty = true;
         }
 
@@ -400,6 +538,7 @@ namespace ColorFood.Drawing
 
             Color32 c = palette.ColorOf(CurrentColorId);
             var inRegion = new bool[_fill.Length];
+            var filled = new List<int>(region);
             foreach (int idx in region)
             {
                 inRegion[idx] = true;
@@ -419,15 +558,70 @@ namespace ColorFood.Drawing
                     {
                         _fill[i] = CurrentColorId;
                         _pixels[i] = c;
+                        filled.Add(i);
                     }
                 }
             }
             _dirty = true;
+            _events.Add(new CanvasEvent { BucketPixels = filled.ToArray(), ColorId = CurrentColorId });
+        }
+
+        /// <summary>
+        /// Xét lại mọi nét sáp đang là viền (StrokeClassifier.Reconcile) — sửa các nét
+        /// tô được vẽ TRƯỚC khi viền khép kín. Có nét đổi thì dựng lại mặt nạ mực, bản
+        /// đồ màu tô và point cloud từ danh sách thao tác. Màn hình giữ nguyên (nét
+        /// viền và nét tô trông giống nhau). Gọi tự động trước khi chấm điểm.
+        /// </summary>
+        public void EnsureReconciled()
+        {
+            if (!_needsReconcile || !HasPalette) return;
+            _needsReconcile = false;
+
+            var strokes = new List<DrawnStroke>();
+            foreach (var ev in _events) if (ev.Stroke != null) strokes.Add(ev.Stroke);
+
+            int before = 0;
+            foreach (var st in strokes) if (st.IsFill) before++;
+            if (!StrokeClassifier.Reconcile(strokes, textureSize, textureSize, closeGapPixels,
+                                            minRegionArea, palette.Table))
+                return;
+
+            int after = 0;
+            foreach (var st in strokes) if (st.IsFill) after++;
+            RebuildFromEvents();
+            if (logOnEvaluate)
+                Debug.Log($"[DrawingCanvas] Xét lại: {after - before} nét sáp đổi từ VIỀN sang TÔ.");
+        }
+
+        /// <summary>Dựng lại _ink, _inkColor, _fill, _points theo đúng thứ tự thao tác.</summary>
+        private void RebuildFromEvents()
+        {
+            for (int i = 0; i < _ink.Length; i++) { _ink[i] = false; _inkColor[i] = -1; _fill[i] = -1; }
+            _points.Clear();
+            _strokeId = 0;
+
+            foreach (var ev in _events)
+            {
+                if (ev.BucketPixels != null)
+                {
+                    foreach (int i in ev.BucketPixels) if (!_ink[i]) _fill[i] = ev.ColorId;
+                    continue;
+                }
+
+                DrawnStroke st = ev.Stroke;
+                StampStroke(st.Points, !st.IsFill, st.Radius, st.ColorId);
+                if (st.IsFill) continue;
+
+                foreach (Point p in st.Points) _points.Add(new Point(p.X, p.Y, _strokeId, st.ColorId));
+                _strokeId++;
+            }
+            _regionsDirty = true;
         }
 
         /// <summary>Danh sách vùng kín hiện có (đã tính cả đoạn vá khe hở).</summary>
         public RegionSet AnalyzeRegions()
         {
+            EnsureReconciled();
             bool[] closure;
             bool[] barrier = BuildBarrier(out closure);
             return RegionAnalyzer.Analyze(barrier, textureSize, textureSize, minRegionArea);
@@ -464,6 +658,7 @@ namespace ColorFood.Drawing
         /// </summary>
         public PointCloud BuildPointCloud(string name = "drawn")
         {
+            EnsureReconciled();
             if (_points.Count < 2)
             {
                 if (logOnEvaluate) Debug.LogWarning("[DrawingCanvas] Chưa đủ điểm để tạo PointCloud.");

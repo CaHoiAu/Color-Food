@@ -291,7 +291,7 @@ MonoBehaviour:
   canvas: {fileID: 1199532455}
   palette: {fileID: 0}
   ingredients:
-  - {fileID: 11400000, guid: 085eca96f6132e7489165f964c40c201, type: 2}
+  - {fileID: 11400000, guid: 5cf8f046806f3834792f22c126198876, type: 2}
   passThreshold: 0.7
   csvFileName: scoring_log.csv
 --- !u!1 &519420028
@@ -628,6 +628,8 @@ MonoBehaviour:
   textureSize: 512
   brushColor: {r: 0, g: 0, b: 0, a: 1}
   brushRadius: 4
+  crayonRadius: 8
+  crayonGrain: 0.3
   minPointDistance: 3
   palette: {fileID: 11400000, guid: 35bc023e022073a4ea46f7c939d7134b, type: 2}
   closeGapPixels: 25

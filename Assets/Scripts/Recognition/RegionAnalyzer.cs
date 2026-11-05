@@ -72,7 +72,8 @@ namespace ColorFood.Recognition
     public static class RegionAnalyzer
     {
         /// <param name="minArea">Vùng nhỏ hơn số pixel này bị bỏ (lỗ do hai nét chồng nhau).</param>
-        public static RegionSet Analyze(bool[] barrier, int w, int h, int minArea = 40)
+        /// <param name="measure">false = chỉ gán nhãn vùng (nhanh), bỏ qua vai trò, chu vi, độ gai.</param>
+        public static RegionSet Analyze(bool[] barrier, int w, int h, int minArea = 40, bool measure = true)
         {
             var set = new RegionSet { Width = w, Height = h, Labels = new int[w * h] };
             for (int i = 0; i < set.Labels.Length; i++) set.Labels[i] = -1;
@@ -115,6 +116,8 @@ namespace ColorFood.Recognition
                 set.Regions.Add(r);
                 set.TotalArea += r.Area;
             }
+
+            if (!measure) return set;
 
             // AssignRoles trước ComputePerimeters: ComputePerimeters cần biết
             // Outer/Inner để loại viền-lỗ-bên-trong (xem ghi chú dưới).

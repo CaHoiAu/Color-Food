@@ -19,7 +19,9 @@ namespace ColorFood.Drawing
     ///      vào ô tương ứng. Palette gán cho DrawingCanvas (tester tự lấy từ đó).
     ///   2. Play. Chọn nguyên liệu bằng phím 1–9.
     ///   3. Chọn màu bằng ô màu bên trái hoặc phím [ ] — màu dùng cho CẢ nét vẽ lẫn tô.
-    ///      D = vẽ nét viền, F = tô sáp màu (kéo), G = thùng sơn (bấm vào vùng kín).
+    ///      F = sáp màu (mặc định): dùng cho cả viền lẫn tô, tự đoán khi nhấc tay —
+    ///          vẽ viền trước, rồi tô bên trong CÙNG MÀU viền.
+    ///      D = bút vẽ viền mảnh, G = thùng sơn (bấm vào vùng kín).
     ///   4. ENTER = chấm điểm + ghi CSV. C = xóa canvas, không ghi.
     ///
     /// Màu và nút bấm vẽ bằng IMGUI (OnGUI) để khỏi phải dựng UI trong scene;
@@ -74,6 +76,7 @@ namespace ColorFood.Drawing
 
             // Bắt đầu bằng màu tối nhất (màu 0 thường là trắng — vẽ nét trắng sẽ không thấy)
             canvas.SetColor(DarkestColor());
+            canvas.SetTool(DrawingCanvas.Tool.Crayon);
             PrepareCsv();
 
             var keys = new StringBuilder();
@@ -93,7 +96,7 @@ namespace ColorFood.Drawing
             }
 
             Debug.Log("[ColoringTester] Sẵn sàng. Phím nguyên liệu:" + keys +
-                      "\nD = vẽ nét, F = tô sáp màu, G = thùng sơn, [ ] = đổi màu, ENTER = chấm điểm, C = xóa.\n" +
+                      "\nF = sáp màu (viền + tô, tự đoán), D = bút viền, G = thùng sơn, [ ] = đổi màu, ENTER = chấm điểm, C = xóa.\n" +
                       $"File CSV: {_csvPath}");
         }
 

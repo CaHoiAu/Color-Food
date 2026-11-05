@@ -826,8 +826,13 @@ public class ColoringTests
         var rules = PartPresets.BodyWithDetails(new[] { "red" }, new[] { "green" });
         var r = IngredientScorer.Score(1f, regions, d.Fill, _colors, 0.4f, rules, 0.5f);
 
-        Assert.AreEqual(1, r.PartResults[0].Count, "thân = đúng 1 vùng lớn nhất");
-        Assert.AreEqual(1, r.PartResults[1].Count, "lá = vùng còn lại");
+        var info = "Luật: " + rules[0].role + " / " + rules[1].role + ". Vùng:";
+        foreach (var g in regions.Regions) info += " #" + g.Id + " " + g.Role + " " + g.Area + "px";
+        info += "\n" + r.Report;
+
+        Assert.AreEqual(2, regions.Regions.Count, "phải có 2 vùng kín (thân + lá). " + info);
+        Assert.AreEqual(1, r.PartResults[0].Count, "thân = đúng 1 vùng lớn nhất. " + info);
+        Assert.AreEqual(1, r.PartResults[1].Count, "lá = vùng còn lại. " + info);
         Assert.Greater(r.PartResults[0].ColorScore, 0.95f, r.Report);
         Assert.Greater(r.PartResults[1].ColorScore, 0.95f, r.Report);
         Assert.Greater(r.Total, 0.95f, r.Report);
@@ -879,5 +884,187 @@ public class ColoringTests
 
         Assert.Greater(r.Spill, 0.05f);
         Assert.Less(r.Spill, 0.5f);
+    }
+
+    // ------------------------------------------------------------------
+    // Một công cụ sáp màu: tự đoán nét viền / nét tô
+    // ------------------------------------------------------------------
+
+    /// <summary>Nét zig-zag tô qua lại trong hình chữ nhật (như tô sáp).</summary>
+    private static List<Point> Scribble(float x0, float y0, float x1, float y1, int colorId, int rows = 8)
+    {
+        var pts = new List<Point>();
+        for (int i = 0; i <= rows; i++)
+        {
+            float y = y0 + (y1 - y0) * i / rows;
+            pts.Add(new Point(i % 2 == 0 ? x0 : x1, y, 0, colorId));
+            pts.Add(new Point(i % 2 == 0 ? x1 : x0, y, 0, colorId));
+        }
+        return pts;
+    }
+
+    private (RegionSet regions, int[][] outlineColors) RedCircle()
+    {
+        var d = Draw(Ellipse(256, 256, 150, 150));
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        return (regions, StrokeClassifier.RegionOutlineColors(regions, InkColors(d, Red), _colors.Count));
+    }
+
+    [Test]
+    public void Stroke_OutlineColor_IsMajorityInkColor()
+    {
+        var (_, outline) = RedCircle();
+        Assert.AreEqual(1, outline.Length);
+        Assert.AreEqual(new[] { Red }, outline[0]);
+    }
+
+    [Test]
+    public void Stroke_SameColorScribbleInside_IsFill()
+    {
+        var (regions, outline) = RedCircle();
+        Assert.IsTrue(StrokeClassifier.IsFill(Scribble(180, 180, 330, 330, Red), Red,
+                                              regions, outline, _colors));
+        // màu gần giống viền (đỏ đậm trong viền đỏ) vẫn là tô
+        Assert.IsTrue(StrokeClassifier.IsFill(Scribble(180, 180, 330, 330, 6), 6,
+                                              regions, outline, _colors));
+    }
+
+    [Test]
+    public void Stroke_OtherColorInside_IsOutline()
+    {
+        // Lá xanh vẽ chồng lên thân đỏ = một bộ phận mới, không phải tô
+        var (regions, outline) = RedCircle();
+        Assert.IsFalse(StrokeClassifier.IsFill(Scribble(220, 300, 300, 340, Green), Green,
+                                               regions, outline, _colors));
+    }
+
+    [Test]
+    public void Stroke_MostlyOutside_IsOutline()
+    {
+        var (regions, outline) = RedCircle();
+        Assert.IsFalse(StrokeClassifier.IsFill(Scribble(20, 20, 200, 120, Red), Red,
+                                               regions, outline, _colors));
+    }
+
+    [Test]
+    public void Stroke_NoRegionsYet_IsOutline()
+    {
+        var empty = RegionAnalyzer.Analyze(new bool[W * H], W, H);
+        Assert.IsFalse(StrokeClassifier.IsFill(Scribble(180, 180, 330, 330, Red), Red,
+                                               empty, new int[0][], _colors));
+    }
+
+    /// <summary>Vẽ nhiều nét, mỗi nét một màu — trả về hình + màu mực từng pixel.</summary>
+    private static (Drawing d, int[] ink) DrawColored(params (List<Point> pts, int color)[] strokes)
+    {
+        var all = new List<Point>();
+        var ink = new int[W * H];
+        for (int i = 0; i < ink.Length; i++) ink[i] = -1;
+        for (int s = 0; s < strokes.Length; s++)
+        {
+            var mask = new bool[W * H];
+            var pts = new List<Point>();
+            foreach (var p in strokes[s].pts) pts.Add(new Point(p.X, p.Y, s));
+            Raster.DrawPoints(mask, W, H, pts, Brush);
+            for (int i = 0; i < mask.Length; i++) if (mask[i]) ink[i] = strokes[s].color;
+            all.AddRange(pts);
+        }
+        return (Draw(all), ink);
+    }
+
+    [Test]
+    public void Stroke_RegionWithTwoOutlineColors_AcceptsEither()
+    {
+        // Thân đỏ bị một nét xanh chia đôi: nửa trái có viền ~60% đỏ, ~40% xanh —
+        // giống vùng lá nằm giữa viền lá xanh và một đoạn viền thân đỏ dài hơn.
+        var line = new List<Point> { new Point(256, 80, 0), new Point(256, 432, 0) };
+        var (d, ink) = DrawColored((Ellipse(256, 256, 150, 150), Red), (line, Green));
+        var regions = RegionAnalyzer.Analyze(d.Barrier, W, H);
+        var outline = StrokeClassifier.RegionOutlineColors(regions, ink, _colors.Count);
+
+        Assert.AreEqual(2, regions.Regions.Count);
+        int left = regions.Labels[256 * W + 190];
+        Assert.AreEqual(Red, outline[left][0], "đỏ chiếm đa số viền");
+        CollectionAssert.Contains(outline[left], Green, "xanh cũng là màu viền của vùng");
+
+        Assert.IsTrue(StrokeClassifier.IsFill(Scribble(150, 180, 240, 330, Green), Green,
+                                              regions, outline, _colors), "tô xanh trong vùng có viền xanh");
+        Assert.IsTrue(StrokeClassifier.IsFill(Scribble(150, 180, 240, 330, Red), Red,
+                                              regions, outline, _colors), "tô đỏ trong vùng có viền đỏ");
+        Assert.IsFalse(StrokeClassifier.IsFill(Scribble(150, 180, 240, 330, Blue), Blue,
+                                               regions, outline, _colors), "màu không có trong viền = viền mới");
+    }
+
+    // ------------------------------------------------------------------
+    // Xét lại sau cùng: tô xen kẽ với vẽ viền, không phụ thuộc thứ tự
+    // ------------------------------------------------------------------
+
+    private static DrawnStroke Crayon(List<Point> pts, int colorId, bool auto = true)
+        => new DrawnStroke { Points = pts, ColorId = colorId, Radius = 8, Auto = auto };
+
+    private bool Reconcile(List<DrawnStroke> strokes)
+        => StrokeClassifier.Reconcile(strokes, W, H, 25f, 40, _colors);
+
+    [Test]
+    public void Reconcile_FillBeforeOutline_BecomesFill()
+    {
+        // Tô hai nét chồng nhau TRƯỚC, vẽ viền bao quanh SAU
+        var strokes = new List<DrawnStroke>
+        {
+            Crayon(Scribble(180, 180, 330, 330, Red), Red),
+            Crayon(Scribble(200, 200, 310, 310, Red, rows: 6), Red),
+            Crayon(Ellipse(256, 256, 150, 150), Red),
+        };
+
+        Assert.IsTrue(Reconcile(strokes));
+        Assert.IsTrue(strokes[0].IsFill, "nét tô 1");
+        Assert.IsTrue(strokes[1].IsFill, "nét tô 2 (chồng lên nét 1)");
+        Assert.IsFalse(strokes[2].IsFill, "viền giữ nguyên");
+    }
+
+    [Test]
+    public void Reconcile_LeafFilledBeforeLeafOutline_BecomesFill()
+    {
+        var strokes = new List<DrawnStroke>
+        {
+            Crayon(Ellipse(256, 220, 150, 150), Red),               // thân
+            Crayon(Scribble(236, 412, 276, 428, Green, rows: 4), Green), // tô lá, lá chưa có viền
+            Crayon(Ellipse(256, 420, 40, 25), Green),               // viền lá vẽ sau
+        };
+
+        Reconcile(strokes);
+
+        Assert.IsTrue(strokes[1].IsFill, "nét tô lá");
+        Assert.IsFalse(strokes[0].IsFill);
+        Assert.IsFalse(strokes[2].IsFill);
+    }
+
+    [Test]
+    public void Reconcile_KeepsRealOutlines()
+    {
+        // Viền vẽ hai lần (đè lên nhau) + một nét xanh chia đôi: tất cả vẫn là viền
+        var line = new List<Point> { new Point(256, 80, 0), new Point(256, 432, 0) };
+        var strokes = new List<DrawnStroke>
+        {
+            Crayon(Ellipse(256, 256, 150, 150), Red),
+            Crayon(Ellipse(256, 256, 150, 150), Red),
+            Crayon(line, Green),
+        };
+
+        Assert.IsFalse(Reconcile(strokes));
+        foreach (var st in strokes) Assert.IsFalse(st.IsFill);
+    }
+
+    [Test]
+    public void Reconcile_PenStrokes_NeverChange()
+    {
+        var strokes = new List<DrawnStroke>
+        {
+            Crayon(Scribble(180, 180, 330, 330, Red), Red, auto: false),
+            Crayon(Ellipse(256, 256, 150, 150), Red, auto: false),
+        };
+
+        Assert.IsFalse(Reconcile(strokes));
+        Assert.IsFalse(strokes[0].IsFill);
     }
 }
