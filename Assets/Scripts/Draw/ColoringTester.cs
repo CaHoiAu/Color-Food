@@ -28,7 +28,8 @@ namespace ColorFood.Drawing
     /// nằm ở mép trái Game view nên cần Game view đủ rộng (ví dụ Full HD 1920×1080).
     ///
     /// CSV scoring_log.csv nằm cạnh calibration.csv (đường dẫn in ra Console):
-    /// time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner
+    /// time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner,
+    /// sketchD,sketchShape,sketchColor,sketchCoverage,sketchTotal   (5 cột cuối: cách chấm ảnh màu — điểm chính)
     /// (circOuter/circInner = độ tròn thô, spikeOuter/spikeInner = độ gai của lòng trắng/lòng đỏ,
     ///  dùng để hiệu chỉnh minRoundness / maxSpikiness.
     ///  Header đổi nên file cũ tự được cất thành scoring_log.csv.old-... và tạo file mới.)
@@ -44,7 +45,8 @@ namespace ColorFood.Drawing
         [SerializeField] private string csvFileName = "scoring_log.csv";
 
         private const string CsvHeader =
-            "time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner";
+            "time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner," +
+            "sketchD,sketchShape,sketchColor,sketchCoverage,sketchTotal";
 
         private readonly PDollarRecognizer _recognizer = new PDollarRecognizer();
         private int _index;
@@ -144,35 +146,55 @@ namespace ColorFood.Drawing
         private void ScoreNow()
         {
             var t = Current;
+            // Cách chấm chính: ảnh màu (không phân biệt viền / tô)
+            SketchResult sk = canvas.ScoreSketch(t, _recognizer);
+            // Cách cũ (vùng kín + đoán viền/tô) — in kèm để so sánh
             ScoreResult r = canvas.ScoreIngredient(t, _recognizer, out float d);
-            if (r == null)
+            if (sk == null && r == null)
             {
                 Debug.LogWarning("[ColoringTester] Chưa vẽ gì (hoặc thiếu template/palette).");
                 return;
             }
 
-            bool pass = r.Total >= passThreshold;
+            float total = sk != null ? sk.Total : r.Total;
+            bool pass = total >= passThreshold;
             string verdict = pass ? "<color=green>ĐẠT</color>" : "<color=orange>CHƯA ĐẠT</color>";
-            _lastReport = $"{t.ingredientId}: {r.Total:P0} {(pass ? "ĐẠT" : "CHƯA ĐẠT")}";
+            _lastReport = $"{t.ingredientId}: {total:P0} {(pass ? "ĐẠT" : "CHƯA ĐẠT")}";
 
-            Debug.Log($"[{t.ingredientId}] d = {d:F4}  |  TỔNG {r.Total:P0} {verdict}\n{r.Report}");
+            var log = new StringBuilder($"[{t.ingredientId}] TỔNG {total:P0} {verdict}\n");
+            if (sk != null) log.Append($"ẢNH MÀU (d = {sk.Distance:F4}):\n{sk.Report}");
+            if (r != null) log.Append($"--- cách cũ, để so sánh: {r.Total:P0} (d = {d:F4})\n{r.Report}");
+            Debug.Log(log.ToString());
 
             var row = new StringBuilder();
             row.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
             row.Append(',').Append(t.ingredientId);
             row.Append(',').Append(canvas.StrokeCount);
             row.Append(',').Append(canvas.RawPoints.Count);
-            row.Append(',').Append(d.ToString("F5", CultureInfo.InvariantCulture));
-            row.Append(',').Append(r.Shape.ToString("F4", CultureInfo.InvariantCulture));
-            row.Append(',').Append(r.Parts.ToString("F4", CultureInfo.InvariantCulture));
-            row.Append(',').Append(r.Total.ToString("F4", CultureInfo.InvariantCulture));
-            row.Append(',').Append(r.Capped ? 1 : 0);
-            row.Append(',').Append(r.OuterCount);
-            row.Append(',').Append(r.InnerCount);
-            row.Append(',').Append(r.OuterCircularity.ToString("F4", CultureInfo.InvariantCulture));
-            row.Append(',').Append(r.InnerCircularity.ToString("F4", CultureInfo.InvariantCulture));
-            row.Append(',').Append(r.OuterSpikiness.ToString("F4", CultureInfo.InvariantCulture));
-            row.Append(',').Append(r.InnerSpikiness.ToString("F4", CultureInfo.InvariantCulture));
+            if (r != null)
+            {
+                row.Append(',').Append(d.ToString("F5", CultureInfo.InvariantCulture));
+                row.Append(',').Append(r.Shape.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(r.Parts.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(r.Total.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(r.Capped ? 1 : 0);
+                row.Append(',').Append(r.OuterCount);
+                row.Append(',').Append(r.InnerCount);
+                row.Append(',').Append(r.OuterCircularity.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(r.InnerCircularity.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(r.OuterSpikiness.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(r.InnerSpikiness.ToString("F4", CultureInfo.InvariantCulture));
+            }
+            else row.Append(",,,,,,,,,,,");
+            if (sk != null)
+            {
+                row.Append(',').Append(sk.Distance.ToString("F5", CultureInfo.InvariantCulture));
+                row.Append(',').Append(sk.Shape.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(sk.Color.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(sk.Coverage.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(sk.Total.ToString("F4", CultureInfo.InvariantCulture));
+            }
+            else row.Append(",,,,,");
             File.AppendAllText(_csvPath, row + "\n", new UTF8Encoding(false));
         }
 

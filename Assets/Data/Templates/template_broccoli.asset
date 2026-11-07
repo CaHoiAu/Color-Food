@@ -940,4 +940,8 @@ MonoBehaviour:
   shapeCap: 0.5
   roundnessCap: 0.5
   parts: []
+  sketchMaxDistance: 0.12
+  minColorCoverage: 0.6
+  colorMap: 
+  colorMapSize: 0
   notes: 

@@ -80,6 +80,7 @@ namespace ColorFood.Drawing
         private bool[] _ink;                // true = pixel có mực
         private int[] _inkColor;            // ColorID của nét mực từng pixel, -1 = không có / không có palette
         private int[] _fill;                // ColorID từng pixel, -1 = chưa tô
+        private int[] _paint;               // màu của nét CUỐI CÙNG phủ lên pixel (mọi loại nét) — cho cách chấm ảnh màu
 
         private readonly List<Point> _points = new List<Point>();
         private int _strokeId;
@@ -117,6 +118,12 @@ namespace ColorFood.Drawing
 
         /// <summary>ColorID nét viền từng pixel (-1 = không phải mực). Chỉ đọc — dùng để chấm điểm.</summary>
         public int[] InkColorIds => _inkColor;
+
+        /// <summary>
+        /// Màu từng pixel, không phân biệt viền hay tô (nét sau đè nét trước; cả vệt
+        /// nét sáp, kể cả chỗ vân giấy). -1 = trống. Dùng cho cách chấm ảnh màu.
+        /// </summary>
+        public int[] PaintIds => _paint;
         public int TextureSize => textureSize;
 
         // ------------------------------------------------------------------
@@ -135,6 +142,7 @@ namespace ColorFood.Drawing
             _ink = new bool[textureSize * textureSize];
             _inkColor = new int[textureSize * textureSize];
             _fill = new int[textureSize * textureSize];
+            _paint = new int[textureSize * textureSize];
             _image.texture = _texture;
 
             Clear();
@@ -397,6 +405,7 @@ namespace ColorFood.Drawing
                     _ink[i] = true;
                     _inkColor[i] = colorId;
                     _fill[i] = -1;     // nét viền đè lên chỗ đã tô: pixel này giờ là mực
+                    _paint[i] = hasPalette ? colorId : ColorSketch.NoColor;
                 }
             }
             _dirty = true;
@@ -422,7 +431,9 @@ namespace ColorFood.Drawing
                     int px = cx + x, py = cy + y;
                     if (px < 0 || px >= textureSize || py < 0 || py >= textureSize) continue;
 
-                    if (Grain(px, py) >= crayonGrain) _pixels[py * textureSize + px] = c;
+                    int i = py * textureSize + px;
+                    _paint[i] = CurrentColorId;
+                    if (Grain(px, py) >= crayonGrain) _pixels[i] = c;
                 }
             }
             _dirty = true;
@@ -468,6 +479,7 @@ namespace ColorFood.Drawing
                 _ink[i] = false;
                 _inkColor[i] = -1;
                 _fill[i] = -1;
+                _paint[i] = -1;
             }
 
             _points.Clear();
@@ -543,6 +555,7 @@ namespace ColorFood.Drawing
             {
                 inRegion[idx] = true;
                 _fill[idx] = CurrentColorId;
+                _paint[idx] = CurrentColorId;
                 if (!_ink[idx]) _pixels[idx] = c;
             }
 
@@ -557,6 +570,7 @@ namespace ColorFood.Drawing
                         inRegion[i - textureSize] || inRegion[i + textureSize])
                     {
                         _fill[i] = CurrentColorId;
+                        _paint[i] = CurrentColorId;
                         _pixels[i] = c;
                         filled.Add(i);
                     }
@@ -650,6 +664,22 @@ namespace ColorFood.Drawing
                                           template.missingPartCap,
                                           template.minShape, template.shapeCap,
                                           template.roundnessCap, _inkColor);
+        }
+
+        /// <summary>Bức vẽ hiện tại thu về lưới màu (cho cách chấm ảnh màu).</summary>
+        public ColorSketch BuildSketch() => ColorSketch.FromPaint(_paint, textureSize, textureSize);
+
+        /// <summary>
+        /// Chấm kiểu ẢNH MÀU (SketchScorer): hình theo đường bao cả bức + màu theo vị
+        /// trí so với mẫu tô sẵn. Không phân biệt viền / tô, không phụ thuộc thứ tự vẽ.
+        /// null nếu chưa vẽ gì / thiếu template hoặc palette.
+        /// </summary>
+        public SketchResult ScoreSketch(IngredientTemplate template, PDollarRecognizer recognizer)
+        {
+            if (template == null || !HasPalette) return null;
+            return SketchScorer.Score(BuildSketch(), template.GetSketchShapes(), recognizer, palette.Table,
+                                      template.sketchMaxDistance, template.shapeWeight,
+                                      template.minColorCoverage, template.minShape, template.shapeCap);
         }
 
         /// <summary>

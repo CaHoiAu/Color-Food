@@ -90,5 +90,29 @@ namespace ColorFood.Recognition
             for (int i = 0; i < n; i++) opened[i] = toEroded[i] <= r2;
             return opened;
         }
+
+        /// <summary>
+        /// Đóng hình bằng đĩa bán kính r: nở rồi co lại. Lấp khe hẹp hơn ~2r (vệt
+        /// trắng giữa các nét sáp, khe giữa viền và phần tô) mà không phình hình ra.
+        /// </summary>
+        public static bool[] Close(bool[] mask, int w, int h, int r)
+        {
+            int n = w * h;
+            long r2 = (long)r * r;
+
+            // Nở: pixel thuộc kết quả nếu có pixel của hình trong bán kính r
+            double[] toMask = SquaredDistance(mask, w, h);
+            var dilated = new bool[n];
+            for (int i = 0; i < n; i++) dilated[i] = toMask[i] <= r2;
+
+            // Co: giữ pixel không có nền nào trong bán kính r
+            var notDilated = new bool[n];
+            for (int i = 0; i < n; i++) notDilated[i] = !dilated[i];
+            double[] toBackground = SquaredDistance(notDilated, w, h);
+
+            var closed = new bool[n];
+            for (int i = 0; i < n; i++) closed[i] = dilated[i] && toBackground[i] > r2;
+            return closed;
+        }
     }
 }

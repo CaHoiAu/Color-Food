@@ -21,6 +21,10 @@ namespace ColorFood.Data
         public Point[] rawPoints = new Point[0];
         public int strokeCount;
 
+        [Tooltip("Ảnh màu của mẫu (ColorSketch.ToRle) — do Template Recorder ghi khi vẽ có màu.")]
+        [HideInInspector] public string colorMap = "";
+        [HideInInspector] public int colorMapSize;
+
         public bool IsValid => rawPoints != null && rawPoints.Length >= 2;
     }
 
@@ -107,10 +111,24 @@ namespace ColorFood.Data
                  "Có thể điền nhanh bằng menu Color Food → Presets.")]
         public PartRule[] parts = new PartRule[0];
 
+        [Header("Cách chấm ảnh màu (không phân biệt viền / tô)")]
+        [Tooltip("Khoảng cách $P (giữa ĐƯỜNG BAO hình) ứng với điểm hình = 0. Khác maxDistance " +
+                 "của cách chấm cũ (so từng nét). Hiệu chỉnh bằng tab 'Thử chấm điểm' của Template Recorder.")]
+        public float sketchMaxDistance = 0.12f;
+
+        [Tooltip("Mỗi phần màu của mẫu tô được ≥ tỉ lệ này diện tích thì không bị trừ điểm phủ.")]
+        [Range(0.1f, 1f)] public float minColorCoverage = 0.6f;
+
+        [Tooltip("Ảnh màu của mẫu 1 (ColorSketch.ToRle) — do Template Recorder ghi khi vẽ có màu. " +
+                 "Trống = mẫu chỉ có nét: chỉ chấm hình, không chấm màu.")]
+        [HideInInspector] public string colorMap = "";
+        [HideInInspector] public int colorMapSize;
+
         [TextArea]
         public string notes;
 
         [System.NonSerialized] private PointCloud[] _clouds;
+        [System.NonSerialized] private List<SketchShape> _sketchShapes;
 
         /// <summary>Tổng số mẫu, kể cả mẫu 1 (rawPoints) — tính cả mẫu rỗng.</summary>
         public int VariantCount => 1 + (extraVariants != null ? extraVariants.Length : 0);
@@ -175,29 +193,69 @@ namespace ColorFood.Data
             return clouds.Count > 0 ? clouds[0] : null;
         }
 
-        /// <summary>Thay nét vẽ của một mẫu có sẵn (index 0 = mẫu chính).</summary>
-        public void SetVariant(int index, Point[] points, int strokes)
+        /// <summary>Ảnh màu của một mẫu; null nếu mẫu đó chưa vẽ có màu.</summary>
+        public ColorSketch GetVariantSketch(int index)
         {
-            if (index == 0) { rawPoints = points; strokeCount = strokes; }
+            string rle = index == 0 ? colorMap : extraVariants[index - 1].colorMap;
+            int size = index == 0 ? colorMapSize : extraVariants[index - 1].colorMapSize;
+            return ColorSketch.FromRle(size, rle);
+        }
+
+        /// <summary>
+        /// Mọi biến thể cho cách chấm ảnh màu (SketchScorer): từng mẫu × các góc
+        /// xoay / lật tự sinh. Mẫu có ảnh màu dùng ảnh đó; mẫu chỉ có nét thì dựng
+        /// bóng từ nét (chỉ chấm hình). Tính một lần rồi cache.
+        /// </summary>
+        public IReadOnlyList<SketchShape> GetSketchShapes()
+        {
+            if (_sketchShapes != null) return _sketchShapes;
+
+            _sketchShapes = new List<SketchShape>();
+            for (int i = 0; i < VariantCount; i++)
+            {
+                ColorSketch sketch = GetVariantSketch(i);
+                if (sketch == null && IsVariantValid(i)) sketch = ColorSketch.FromStrokes(GetVariantPoints(i));
+                if (sketch == null) continue;
+                _sketchShapes.AddRange(SketchScorer.PrepareTemplate(
+                    sketch, ingredientId + "#" + (i + 1), autoRotateMax, autoRotateStep, autoMirror));
+            }
+            return _sketchShapes;
+        }
+
+        /// <summary>Thay nét vẽ (và ảnh màu, nếu có) của một mẫu có sẵn (index 0 = mẫu chính).</summary>
+        public void SetVariant(int index, Point[] points, int strokes, ColorSketch sketch = null)
+        {
+            string rle = sketch != null ? sketch.ToRle() : "";
+            int size = sketch != null ? sketch.Size : 0;
+            if (index == 0) { rawPoints = points; strokeCount = strokes; colorMap = rle; colorMapSize = size; }
             else
             {
                 extraVariants[index - 1].rawPoints = points;
                 extraVariants[index - 1].strokeCount = strokes;
+                extraVariants[index - 1].colorMap = rle;
+                extraVariants[index - 1].colorMapSize = size;
             }
             InvalidateCache();
         }
 
         /// <summary>Thêm một mẫu mới, trả về chỉ số của nó. Mẫu chính còn trống thì điền vào đó.</summary>
-        public int AddVariant(Point[] points, int strokes, string label = "")
+        public int AddVariant(Point[] points, int strokes, string label = "", ColorSketch sketch = null)
         {
             if (!IsVariantValid(0))
             {
-                SetVariant(0, points, strokes);
+                SetVariant(0, points, strokes, sketch);
                 return 0;
             }
 
             var list = new List<TemplateVariant>(extraVariants ?? new TemplateVariant[0]);
-            list.Add(new TemplateVariant { label = label, rawPoints = points, strokeCount = strokes });
+            list.Add(new TemplateVariant
+            {
+                label = label,
+                rawPoints = points,
+                strokeCount = strokes,
+                colorMap = sketch != null ? sketch.ToRle() : "",
+                colorMapSize = sketch != null ? sketch.Size : 0
+            });
             extraVariants = list.ToArray();
             InvalidateCache();
             return list.Count;
@@ -216,6 +274,8 @@ namespace ColorFood.Data
             {
                 rawPoints = list[0].rawPoints;
                 strokeCount = list[0].strokeCount;
+                colorMap = list[0].colorMap;
+                colorMapSize = list[0].colorMapSize;
                 list.RemoveAt(0);
             }
             else list.RemoveAt(index - 1);
@@ -226,9 +286,9 @@ namespace ColorFood.Data
         }
 
         /// <summary>Gọi khi điểm mẫu bị thay từ code (Inspector tự gọi OnValidate).</summary>
-        public void InvalidateCache() => _clouds = null;
+        public void InvalidateCache() { _clouds = null; _sketchShapes = null; }
 
-        private void OnEnable() => _clouds = null;
-        private void OnValidate() => _clouds = null;
+        private void OnEnable() => InvalidateCache();
+        private void OnValidate() => InvalidateCache();
     }
 }
