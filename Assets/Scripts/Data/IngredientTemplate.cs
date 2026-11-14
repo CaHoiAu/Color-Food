@@ -45,9 +45,10 @@ namespace ColorFood.Data
     /// TẤT CẢ mẫu và lấy mẫu giống nhất — thêm mẫu không bao giờ làm điểm tụt.
     /// Mọi mẫu dùng chung maxDistance và luật bộ phận.
     ///
-    /// GÓC ĐỘ: từ mỗi mẫu còn tự sinh bản xoay nghiêng / lật trái-phải
-    /// (autoRotateMax, autoRotateStep, autoMirror), nên không phải vẽ lại
-    /// cùng một hình ở nhiều góc.
+    /// LẬT: từ mỗi mẫu còn tự sinh bản lật trái ↔ phải (autoMirror), nên lá
+    /// bên trái hay bên phải đều được. KHÔNG tự sinh bản xoay nghiêng: xoay làm
+    /// quả dài (ớt chuông) nằm nghiêng khớp được với quả tròn — muốn chấp nhận
+    /// một tư thế khác thì vẽ nó thành một mẫu riêng.
     /// </summary>
     [CreateAssetMenu(menuName = "Color Food/Ingredient Template", fileName = "template_new")]
     public class IngredientTemplate : ScriptableObject
@@ -72,15 +73,7 @@ namespace ColorFood.Data
                  "Thêm bằng Template Recorder (Lưu → Thêm mẫu mới).")]
         public TemplateVariant[] extraVariants = new TemplateVariant[0];
 
-        [Header("Tự sinh góc độ (không cần vẽ lại)")]
-        [Tooltip("Từ mỗi mẫu tự sinh thêm bản xoay nghiêng tới ±góc này (độ). " +
-                 "0 = tắt. Đừng để quá lớn với hình có hướng rõ (tam giác đỉnh lên " +
-                 "xoay 180° thành đỉnh xuống).")]
-        [Range(0f, 90f)] public float autoRotateMax = 30f;
-
-        [Tooltip("Bước xoay (độ). 30 với bước 15 → thêm các góc ±15°, ±30°.")]
-        [Range(5f, 45f)] public float autoRotateStep = 15f;
-
+        [Header("Tự sinh bản lật (không cần vẽ lại)")]
         [Tooltip("Tự sinh thêm bản lật trái ↔ phải (quả quay hướng ngược lại).")]
         public bool autoMirror = true;
 
@@ -118,6 +111,12 @@ namespace ColorFood.Data
 
         [Tooltip("Mỗi phần màu của mẫu tô được ≥ tỉ lệ này diện tích thì không bị trừ điểm phủ.")]
         [Range(0.1f, 1f)] public float minColorCoverage = 0.6f;
+
+        [Tooltip("So với nguyên liệu khác: nguyên liệu khác được điểm cao hơn đề bài QUÁ mức này thì " +
+                 "bức vẽ bị coi là giống nó hơn → không đạt (chặn ở shapeCap). " +
+                 "0 = khắt khe nhất: hễ có nguyên liệu khác cao hơn đề bài là không đạt. " +
+                 "Lớn hơn = khoan dung hơn với các nguyên liệu na ná nhau.")]
+        [Range(0f, 0.3f)] public float rivalMargin = 0.05f;
 
         [Tooltip("Ảnh màu của mẫu 1 (ColorSketch.ToRle) — do Template Recorder ghi khi vẽ có màu. " +
                  "Trống = mẫu chỉ có nét: chỉ chấm hình, không chấm màu.")]
@@ -179,7 +178,7 @@ namespace ColorFood.Data
             {
                 if (!IsVariantValid(i)) continue;
                 foreach (var (suffix, points) in PointTransform.Variants(
-                             GetVariantPoints(i), autoRotateMax, autoRotateStep, autoMirror))
+                             GetVariantPoints(i), 0f, 0f, autoMirror))
                     list.Add(new PointCloud(ingredientId + "#" + (i + 1) + suffix, points));
             }
             _clouds = list.ToArray();
@@ -217,9 +216,27 @@ namespace ColorFood.Data
                 if (sketch == null && IsVariantValid(i)) sketch = ColorSketch.FromStrokes(GetVariantPoints(i));
                 if (sketch == null) continue;
                 _sketchShapes.AddRange(SketchScorer.PrepareTemplate(
-                    sketch, ingredientId + "#" + (i + 1), autoRotateMax, autoRotateStep, autoMirror));
+                    sketch, ingredientId + "#" + (i + 1), autoMirror));
             }
             return _sketchShapes;
+        }
+
+        /// <summary>
+        /// Mẫu của các nguyên liệu KHÁC để so khi chấm (SketchScorer.Rival): bỏ chính
+        /// target và các template cùng ingredientId; null nếu không còn ai.
+        /// </summary>
+        public static List<SketchScorer.Rival> ToRivals(IngredientTemplate target,
+                                                       IEnumerable<IngredientTemplate> candidates)
+        {
+            if (candidates == null) return null;
+            var list = new List<SketchScorer.Rival>();
+            foreach (var t in candidates)
+            {
+                if (t == null || t == target || (target != null && t.ingredientId == target.ingredientId)) continue;
+                var shapes = t.GetSketchShapes();
+                if (shapes.Count > 0) list.Add(new SketchScorer.Rival(t.ingredientId, shapes));
+            }
+            return list.Count > 0 ? list : null;
         }
 
         /// <summary>Thay nét vẽ (và ảnh màu, nếu có) của một mẫu có sẵn (index 0 = mẫu chính).</summary>

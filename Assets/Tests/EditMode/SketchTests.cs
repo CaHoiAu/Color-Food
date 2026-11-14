@@ -67,7 +67,7 @@ public class SketchTests
     }
 
     private List<SketchShape> Prepare(ColorSketch s, bool mirror = true)
-        => SketchScorer.PrepareTemplate(s, "tomato", 30f, 15f, mirror);
+        => SketchScorer.PrepareTemplate(s, "tomato", mirror);
 
     private SketchResult Score(int[] paint, List<SketchShape> template)
         => SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _recognizer, _colors,
@@ -240,5 +240,147 @@ public class SketchTests
     public void Score_NothingDrawn_ReturnsNull()
     {
         Assert.IsNull(Score(Blank(), Prepare(Template())));
+    }
+
+    // ------------------------------------------------------------------
+    // So với nguyên liệu khác: cà chua / ớt chuông (cùng thân đỏ, lá xanh ở trên)
+    // ------------------------------------------------------------------
+
+    /// <summary>Mẫu ớt chuông: thân đỏ cao (elip đứng), cuống xanh nhỏ ở giữa phía trên.</summary>
+    private static ColorSketch PepperTemplate()
+    {
+        var p = Blank();
+        Solid(p, 256, 220, 100, 150, Red);
+        Solid(p, 256, 385, 18, 25, Green);
+        return ColorSketch.FromPaint(p, W, W);
+    }
+
+    private static int[] PlayerPepper()
+    {
+        var p = Blank();
+        Crayon(p, 220, 250, 70, 105, Red);
+        Crayon(p, 220, 365, 13, 18, Green);
+        return p;
+    }
+
+    private SketchResult ScoreVs(int[] paint, List<SketchShape> template, params (string name, List<SketchShape> shapes)[] rivals)
+    {
+        var list = new List<SketchScorer.Rival>();
+        foreach (var r in rivals) list.Add(new SketchScorer.Rival(r.name, r.shapes));
+        return SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _recognizer, _colors,
+                                  0.12f, 0.4f, 0.6f, rivals: list);
+    }
+
+    /// <summary>Chấm có ngưỡng hình tối thiểu 0.5 như template mặc định trong game.</summary>
+    private SketchResult ScoreGated(int[] paint, List<SketchShape> template)
+        => SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _recognizer, _colors,
+                              0.12f, 0.4f, 0.6f, minShape: 0.5f);
+
+    [Test]
+    public void Rival_PepperDrawn_TomatoTargetAlone_FailsByElongation()
+    {
+        // Trước đây ớt chuông vẫn đạt ~86% ở đề cà chua (chưa có mẫu ớt để so).
+        // Giờ: ớt dài hơn hẳn cà chua → điểm hình bị nhân hệ số thon dài → dưới minShape.
+        var r = ScoreGated(PlayerPepper(), Prepare(Template()));
+        Assert.Less(r.ElongationFactor, 0.7f, r.Report);
+        Assert.LessOrEqual(r.Total, 0.5f, r.Report);
+    }
+
+    [Test]
+    public void Elongation_CircleAndEllipse()
+    {
+        var p = Blank();
+        Solid(p, 256, 256, 150, 150, Red);
+        var s = ColorSketch.FromPaint(p, W, W);
+        Assert.AreEqual(1f, SketchScorer.Elongation(SketchScorer.Silhouette(SketchScorer.KeptPaint(s), s.Size), s.Size), 0.05f);
+
+        p = Blank();
+        Solid(p, 256, 256, 100, 150, Red);   // elip đứng 1.5 : 1
+        s = ColorSketch.FromPaint(p, W, W);
+        Assert.AreEqual(1.5f, SketchScorer.Elongation(SketchScorer.Silhouette(SketchScorer.KeptPaint(s), s.Size), s.Size), 0.08f);
+    }
+
+    [Test]
+    public void Elongation_AppleDrawn_PepperTarget_Fails()
+    {
+        // Chưa có mẫu táo — vẫn phải không đạt ở đề ớt chuông vì táo tròn, ớt dài
+        var p = Blank();
+        Crayon(p, 230, 240, 105, 95, Red);
+        Crayon(p, 270, 350, 30, 16, Green);
+        var r = ScoreGated(p, Prepare(PepperTemplate()));
+
+        Assert.Less(r.ElongationFactor, 0.5f, r.Report);
+        Assert.LessOrEqual(r.Total, 0.5f, r.Report);
+    }
+
+    [Test]
+    public void NoRotation_TiltedPepper_IsNotAccepted()
+    {
+        // Đã bỏ bản xoay tự sinh: ớt vẽ nghiêng 25° không còn khớp mẫu đứng thẳng.
+        // (Độ thon dài không đổi khi xoay nên không bị phạt — phần sai là vị trí,
+        // hướng của đường bao và cuống.)
+        var p = Blank();
+        double a = 25 * Math.PI / 180, cos = Math.Cos(a), sin = Math.Sin(a);
+        for (int y = 0; y < W; y++)
+            for (int x = 0; x < W; x++)
+            {
+                double xr = (x - 220) * cos + (y - 250) * sin, yr = -(x - 220) * sin + (y - 250) * cos;
+                double e = Math.Pow(xr / 70, 2) + Math.Pow(yr / 105, 2);
+                if (e <= 1 && (e >= Math.Pow(1 - 8.0 / 70, 2) || x % 10 < 7)) p[y * W + x] = Red;
+            }
+        Crayon(p, (float)(220 - 115 * sin), (float)(250 + 115 * cos), 13, 18, Green);
+
+        var r = ScoreGated(p, Prepare(PepperTemplate()));
+        Assert.AreEqual(1f, r.ElongationFactor, 1e-6f, r.Report);
+        Assert.Less(r.Total, 0.7f, r.Report);
+    }
+
+    [Test]
+    public void NoRotation_VariantsAreOriginalAndMirrorOnly()
+    {
+        var shapes = Prepare(Template());
+        Assert.AreEqual(2, shapes.Count);
+        Assert.AreEqual("tomato", shapes[0].Name);
+        StringAssert.Contains("lật", shapes[1].Name.ToLowerInvariant());
+        Assert.AreEqual(1, Prepare(Template(), mirror: false).Count);
+    }
+
+    [Test]
+    public void Rival_PepperDrawn_TomatoTarget_IsCapped()
+    {
+        var r = ScoreVs(PlayerPepper(), Prepare(Template()), ("pepper", Prepare(PepperTemplate())));
+
+        Assert.AreEqual("pepper", r.Rival, r.Report);
+        Assert.IsTrue(r.RivalCapped, r.Report);
+        Assert.LessOrEqual(r.Total, 0.5f, r.Report);
+    }
+
+    [Test]
+    public void Rival_TomatoDrawn_TomatoTarget_IsNotCapped()
+    {
+        var r = ScoreVs(PlayerTomato(), Prepare(Template()), ("pepper", Prepare(PepperTemplate())));
+
+        Assert.AreEqual("pepper", r.Rival);
+        Assert.IsFalse(r.RivalCapped, r.Report);
+        Assert.Greater(r.Total, 0.8f, r.Report);
+    }
+
+    [Test]
+    public void Rival_UncoloredTemplate_IsIgnored_WhenTargetHasColor()
+    {
+        // Mẫu "circle" cũ chỉ có viền đen: đường bao tròn giống mọi quả tròn tròn,
+        // không được phép chặn một đề bài có màu chỉ vì hình
+        var ring = new List<Point>();
+        for (int i = 0; i <= 120; i++)
+        {
+            double a = 2 * Math.PI * i / 120;
+            ring.Add(new Point((float)(200 + 150 * Math.Cos(a)), (float)(200 + 150 * Math.Sin(a)), 0));
+        }
+        var circle = Prepare(ColorSketch.FromStrokes(ring));
+
+        var r = ScoreVs(PlayerPepper(), Prepare(PepperTemplate()), ("circle", circle));
+
+        Assert.IsFalse(r.RivalCapped, r.Report);
+        Assert.AreEqual("", r.Rival, "mẫu không màu không được tính là nguyên liệu khác");
     }
 }

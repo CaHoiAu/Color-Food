@@ -10,6 +10,8 @@ namespace ColorFood.Recognition
         public string Name;
         public PointCloud Cloud;
         public int[] Grid;
+        /// <summary>Độ thon dài của bóng mẫu (không đổi khi xoay / lật).</summary>
+        public float Elongation = 1f;
     }
 
     /// <summary>Điểm màu của một màu trong mẫu (vd: phần đỏ, phần xanh).</summary>
@@ -31,8 +33,20 @@ namespace ColorFood.Recognition
     public class SketchResult
     {
         public float Distance, Shape, Color = 1f, Total;
+        /// <summary>Độ thon dài bức vẽ / của mẫu, và hệ số nhân vào điểm hình (1 = khớp).</summary>
+        public float Elongation = 1f, TemplateElongation = 1f, ElongationFactor = 1f;
         public float Accuracy = 1f, Coverage = 1f, Spill;
         public bool HasColor, Capped;
+        /// <summary>Bị chặn vì hình dưới minShape.</summary>
+        public bool ShapeCapped;
+        /// <summary>Bị chặn vì bức vẽ giống một nguyên liệu KHÁC rõ rệt hơn (xem Score).</summary>
+        public bool RivalCapped;
+        /// <summary>Nguyên liệu khác giống bức vẽ nhất (rỗng nếu không so) và điểm của nó.</summary>
+        public string Rival = "";
+        public float RivalTotal;
+        /// <summary>Điểm nguyên liệu khác trừ điểm đề bài (âm = đề bài cao hơn), trước mọi mức chặn.</summary>
+        public float RivalLead;
+        public float RivalMargin;
         public string Variant = "";
         public List<ColorPartResult> Parts = new List<ColorPartResult>();
         public string Report = "";
@@ -43,8 +57,12 @@ namespace ColorFood.Recognition
     /// thuộc thứ tự vẽ, không cần luật bộ phận.
     ///
     ///   HÌNH: gộp mọi ô có màu → bỏ mảnh lạc nhỏ → đóng khe (vân sáp) → lấp lỗ
-    ///         → lấy pixel đường bao ngoài → chọn 32 điểm trải đều (farthest point
-    ///         sampling) → chuẩn hóa → so $P với đường bao của mẫu.
+    ///         → lấy pixel đường bao ngoài → chọn CloudPoints (64) điểm trải đều
+    ///         (farthest point sampling) → chuẩn hóa → so $P với đường bao của mẫu.
+    ///         × hệ số ĐỘ THON DÀI (trục dài / trục ngắn của bóng): quả dài (ớt
+    ///         chuông) và quả tròn (táo, cà chua) có độ thon dài khác hẳn nhau.
+    ///         KHÔNG so với bản xoay nghiêng của mẫu — xoay làm quả dài nằm nghiêng
+    ///         khớp được với quả tròn. Tư thế khác thì vẽ thành một mẫu riêng.
     ///   MÀU:  co bức vẽ (theo khung bao các ô có màu) về lưới GridSize×GridSize,
     ///         mỗi ô một màu → so từng ô với lưới của MẪU TÔ SẴN cùng vị trí (cho
     ///         lệch 1 ô). Nhờ so theo vị trí, lá phải xanh ở chỗ lá, thân đỏ ở chỗ
@@ -55,14 +73,33 @@ namespace ColorFood.Recognition
     ///          — lá nhỏ tô sai chỗ cũng kéo điểm xuống như thân tô sai, không bị
     ///          "pha loãng" vì chỉ chiếm ít ô
     ///   tổng = shapeWeight × hình + (1 − shapeWeight) × màu   (mẫu không có màu → tổng = hình)
-    /// Thử mọi biến thể góc độ của mẫu, lấy tổng cao nhất.
+    /// Thử mọi biến thể của mẫu (bản gốc + bản lật), lấy tổng cao nhất.
+    ///
+    /// SO VỚI NGUYÊN LIỆU KHÁC (rivals): chỉ so với một mẫu thì hai nguyên liệu na
+    /// ná nhau (cà chua / ớt chuông: cùng thân đỏ, lá xanh ở trên) vẫn đạt nhầm, vì
+    /// điểm màu gần tối đa. Nên chấm thêm bức vẽ với mẫu của các nguyên liệu khác,
+    /// CÙNG thông số của đề bài; nếu một nguyên liệu khác cao hơn đề bài quá
+    /// rivalMargin thì bức vẽ "giống nó hơn" → tổng bị chặn ở rivalCap.
+    /// rivalMargin = 0: khắt khe nhất — đề bài phải là nguyên liệu giống nhất.
     /// </summary>
     public static class SketchScorer
     {
         public const int GridSize = 24;
+        /// <summary>
+        /// Số điểm lấy trên đường bao. 64 thay vì 32 (như $P theo nét): đo trên mẫu ớt
+        /// chuông / táo thật, khoảng cách táo→ớt so với độ lệch khi vẽ lại chính quả ớt
+        /// tăng từ 1.11 lên 1.40 lần — tách hai quả na ná nhau tốt hơn. Đổi số này thì
+        /// khoảng cách d nhỏ đi (≈ 0.7–0.9 lần): hiệu chỉnh lại sketchMaxDistance.
+        /// Chi phí so $P tăng ≈ (64/32)^2.5 ≈ 5.7 lần — vẫn vài ms.
+        /// </summary>
+        public const int CloudPoints = 64;
         public const int CloseRadius = 2;
         public const float MinComponentShare = 0.03f;
         public const float CellMinFraction = 0.25f;
+        /// <summary>Độ thon dài lệch mẫu tới tỉ lệ này: không phạt (nét tay tự nhiên).</summary>
+        public const float ElongationTolerance = 1.2f;
+        /// <summary>Lệch tới tỉ lệ này: điểm hình về 0 (giảm tuyến tính theo log ở giữa).</summary>
+        public const float ElongationLimit = 1.6f;
 
         // ------------------------------------------------------------------
         // Hình
@@ -140,6 +177,42 @@ namespace ColorFood.Recognition
             }
         }
 
+        /// <summary>
+        /// Độ thon dài của bóng = √(λ lớn / λ nhỏ) của ma trận hiệp phương sai các ô:
+        /// tỉ lệ trục dài / trục ngắn theo HƯỚNG CHÍNH của hình — hình tròn ≈ 1, elip
+        /// 2:1 ≈ 2. Không đổi khi xoay, lật hay co giãn đều.
+        /// </summary>
+        public static float Elongation(bool[] sil, int size)
+        {
+            double n = 0, sx = 0, sy = 0;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    if (sil[y * size + x]) { n++; sx += x; sy += y; }
+            if (n < 2) return 1f;
+            double mx = sx / n, my = sy / n, cxx = 0, cyy = 0, cxy = 0;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    if (!sil[y * size + x]) continue;
+                    double dx = x - mx, dy = y - my;
+                    cxx += dx * dx; cyy += dy * dy; cxy += dx * dy;
+                }
+            double half = (cxx + cyy) / 2, det = cxx * cyy - cxy * cxy;
+            double root = Math.Sqrt(Math.Max(0, half * half - det));
+            double big = half + root, small = half - root;
+            return small <= 1e-9 ? 100f : (float)Math.Sqrt(big / small);
+        }
+
+        /// <summary>Hệ số nhân vào điểm hình: 1 khi độ thon dài lệch mẫu ≤ ElongationTolerance lần.</summary>
+        public static float ElongationFactor(float player, float template)
+        {
+            if (player <= 0f || template <= 0f) return 1f;
+            double e = Math.Abs(Math.Log(player / template));
+            double lo = Math.Log(ElongationTolerance), hi = Math.Log(ElongationLimit);
+            if (e <= lo) return 1f;
+            return Clamp01((float)(1 - (e - lo) / (hi - lo)));
+        }
+
         /// <summary>Ô của bóng có ít nhất một ô kề (4 hướng) nằm ngoài bóng hoặc ngoài lưới.</summary>
         public static List<Point> Boundary(bool[] sil, int size)
         {
@@ -191,10 +264,10 @@ namespace ColorFood.Recognition
             return result;
         }
 
-        /// <summary>Đám mây $P từ pixel đường bao: chọn 32 điểm trải đều, co + dời về gốc.</summary>
+        /// <summary>Đám mây $P từ pixel đường bao: chọn CloudPoints điểm trải đều, co + dời về gốc.</summary>
         public static PointCloud ToCloud(IReadOnlyList<Point> boundary, string name)
         {
-            Point[] sample = FarthestPointSample(boundary, PointCloud.SamplingCount);
+            Point[] sample = FarthestPointSample(boundary, CloudPoints);
             return PointCloud.FromNormalized(name, PointCloud.TranslateToOrigin(PointCloud.Scale(sample)));
         }
 
@@ -358,47 +431,115 @@ namespace ColorFood.Recognition
         // ------------------------------------------------------------------
 
         /// <summary>
-        /// Chuẩn bị mọi biến thể góc độ của một mẫu (bản gốc + xoay ±step..±maxAngle,
-        /// + bản lật nếu mirror). Gọi một lần rồi cache.
+        /// Chuẩn bị các biến thể của một mẫu: bản gốc + bản lật trái ↔ phải (nếu
+        /// mirror). Không có bản xoay. Gọi một lần rồi cache.
         /// </summary>
-        public static List<SketchShape> PrepareTemplate(ColorSketch s, string name,
-                                                        float maxAngle, float step, bool mirror)
+        public static List<SketchShape> PrepareTemplate(ColorSketch s, string name, bool mirror)
         {
             var result = new List<SketchShape>();
             if (s == null) return result;
 
             bool[] kept = KeptPaint(s);
-            List<Point> boundary = Boundary(Silhouette(kept, s.Size), s.Size);
-            if (boundary.Count < PointCloud.SamplingCount) return result;   // hình quá nhỏ
+            bool[] sil = Silhouette(kept, s.Size);
+            List<Point> boundary = Boundary(sil, s.Size);
+            if (boundary.Count < CloudPoints) return result;   // hình quá nhỏ
             List<Point> colored = ColoredPoints(s, kept);
+            float elongation = Elongation(sil, s.Size);
 
-            var shapes = PointTransform.Variants(boundary, maxAngle, step, mirror);
-            var grids = PointTransform.Variants(colored, maxAngle, step, mirror);
+            var shapes = PointTransform.Variants(boundary, 0f, 0f, mirror);
+            var grids = PointTransform.Variants(colored, 0f, 0f, mirror);
             for (int i = 0; i < shapes.Count; i++)
                 result.Add(new SketchShape
                 {
                     Name = name + shapes[i].suffix,
                     Cloud = ToCloud(shapes[i].points, name + shapes[i].suffix),
-                    Grid = Grid(grids[i].points)
+                    Grid = Grid(grids[i].points),
+                    Elongation = elongation
                 });
             return result;
         }
 
-        /// <summary>Chấm bức vẽ người chơi với mọi biến thể của mẫu. null nếu chưa vẽ gì.</summary>
+        /// <summary>Mẫu của một nguyên liệu khác, để so (xem Score).</summary>
+        public struct Rival
+        {
+            public string Name;
+            public IReadOnlyList<SketchShape> Shapes;
+            public Rival(string name, IReadOnlyList<SketchShape> shapes) { Name = name; Shapes = shapes; }
+        }
+
+        public const float DefaultRivalMargin = 0.05f;
+
+        /// <summary>
+        /// Chấm bức vẽ người chơi với mọi biến thể của mẫu. null nếu chưa vẽ gì.
+        /// rivals (tùy chọn): mẫu của các nguyên liệu khác — bức vẽ giống một nguyên
+        /// liệu khác hơn đề bài quá rivalMargin thì tổng bị chặn ở rivalCap.
+        /// </summary>
         public static SketchResult Score(ColorSketch player, IReadOnlyList<SketchShape> template,
                                          PDollarRecognizer recognizer, ColorTable colors,
                                          float maxDistance, float shapeWeight, float minCoverage,
-                                         float minShape = 0f, float shapeCap = 0.5f)
+                                         float minShape = 0f, float shapeCap = 0.5f,
+                                         IReadOnlyList<Rival> rivals = null,
+                                         float rivalMargin = DefaultRivalMargin, float rivalCap = 0.5f)
         {
             if (player == null || template == null || template.Count == 0) return null;
 
             bool[] kept = KeptPaint(player);
-            List<Point> boundary = Boundary(Silhouette(kept, player.Size), player.Size);
-            if (boundary.Count < PointCloud.SamplingCount) return null;   // chưa vẽ gì / quá nhỏ
+            bool[] sil = Silhouette(kept, player.Size);
+            List<Point> boundary = Boundary(sil, player.Size);
+            if (boundary.Count < CloudPoints) return null;   // chưa vẽ gì / quá nhỏ
 
             PointCloud cloud = ToCloud(boundary, "drawn");
             int[] grid = Grid(ColoredPoints(player, kept));
+            float elongation = Elongation(sil, player.Size);
 
+            SketchResult best = BestVariant(cloud, grid, elongation, template, recognizer, colors,
+                                            maxDistance, shapeWeight, minCoverage);
+
+            // So với nguyên liệu khác — cùng thông số của đề bài để điểm so được với nhau.
+            // Đề bài có màu: chỉ so với nguyên liệu CŨNG có màu. Mẫu chỉ có nét (vd circle
+            // viền đen) không đủ thông tin: so riêng hình thì đường bao tròn tròn "giống"
+            // hầu hết mọi quả, trong khi màu — thứ phân biệt nguyên liệu — bị bỏ qua.
+            // Đề bài không có màu: so điểm HÌNH với mọi nguyên liệu.
+            float bestLead = float.MinValue;
+            if (rivals != null)
+                foreach (Rival rv in rivals)
+                {
+                    if (rv.Shapes == null || rv.Shapes.Count == 0) continue;
+                    SketchResult r = BestVariant(cloud, grid, elongation, rv.Shapes, recognizer, colors,
+                                                 maxDistance, shapeWeight, minCoverage);
+                    if (best.HasColor && !r.HasColor) continue;
+                    bool both = r.HasColor && best.HasColor;
+                    float lead = both ? r.Total - best.Total : r.Shape - best.Shape;
+                    if (lead > bestLead)
+                    {
+                        bestLead = lead;
+                        best.RivalLead = lead;
+                        best.Rival = rv.Name;
+                        best.RivalTotal = both ? r.Total : r.Shape;
+                    }
+                }
+
+            best.RivalMargin = rivalMargin;
+            if (best.Rival.Length > 0 && bestLead > rivalMargin && best.Total > rivalCap)
+            {
+                best.Total = rivalCap;
+                best.Capped = best.RivalCapped = true;
+            }
+            if (minShape > 0f && best.Shape < minShape && best.Total > shapeCap)
+            {
+                best.Total = shapeCap;
+                best.Capped = best.ShapeCapped = true;
+            }
+            best.Report = BuildReport(best, colors, minShape, shapeCap, rivalCap);
+            return best;
+        }
+
+        /// <summary>Biến thể có tổng cao nhất của một mẫu (chưa áp mức chặn nào).</summary>
+        private static SketchResult BestVariant(PointCloud cloud, int[] grid, float elongation,
+                                                IReadOnlyList<SketchShape> template,
+                                                PDollarRecognizer recognizer, ColorTable colors,
+                                                float maxDistance, float shapeWeight, float minCoverage)
+        {
             bool hasColor = false;
             foreach (int c in template[0].Grid) if (c >= 0) { hasColor = true; break; }
 
@@ -406,10 +547,14 @@ namespace ColorFood.Recognition
             foreach (SketchShape v in template)
             {
                 float d = recognizer.Match(cloud, v.Cloud);
+                float factor = ElongationFactor(elongation, v.Elongation);
                 var r = new SketchResult
                 {
                     Distance = d,
-                    Shape = PDollarRecognizer.ScoreFromDistance(d, maxDistance),
+                    Shape = PDollarRecognizer.ScoreFromDistance(d, maxDistance) * factor,
+                    Elongation = elongation,
+                    TemplateElongation = v.Elongation,
+                    ElongationFactor = factor,
                     HasColor = hasColor,
                     Variant = v.Name
                 };
@@ -427,20 +572,20 @@ namespace ColorFood.Recognition
 
                 if (best == null || r.Total > best.Total) best = r;
             }
-
-            if (minShape > 0f && best.Shape < minShape && best.Total > shapeCap)
-            {
-                best.Total = shapeCap;
-                best.Capped = true;
-            }
-            best.Report = BuildReport(best, colors, minShape, shapeCap);
             return best;
         }
 
-        private static string BuildReport(SketchResult r, ColorTable colors, float minShape, float shapeCap)
+        private static string BuildReport(SketchResult r, ColorTable colors, float minShape, float shapeCap,
+                                          float rivalCap)
         {
             var sb = new StringBuilder();
             sb.AppendLine("Hình (đường bao): " + Pct(r.Shape) + "  — khớp nhất với " + r.Variant);
+            sb.AppendLine("  Độ thon dài: vẽ " + r.Elongation.ToString("0.00") + " / mẫu " +
+                          r.TemplateElongation.ToString("0.00") +
+                          (r.ElongationFactor < 1f
+                              ? " → lệch quá " + Pct(ElongationTolerance - 1f) + ", điểm hình × " +
+                                r.ElongationFactor.ToString("0.00")
+                              : " → khớp"));
             if (!r.HasColor)
             {
                 sb.AppendLine("Mẫu chưa có màu (vẽ lại mẫu có tô màu trong Template Recorder) → chỉ chấm hình");
@@ -457,7 +602,20 @@ namespace ColorFood.Recognition
                 }
                 if (r.Spill > 0.05f) sb.AppendLine("  Tô lem ra ngoài: " + Pct(r.Spill) + " (không trừ điểm)");
             }
-            if (r.Capped)
+            if (r.Rival.Length > 0)
+            {
+                string verdict;
+                if (r.RivalCapped)
+                    verdict = "cao hơn đề bài " + Pct(r.RivalLead) + " (> " + Pct(r.RivalMargin) + ") → bức vẽ giống " +
+                              r.Rival + " hơn, điểm bị chặn tối đa " + Pct(rivalCap);
+                else if (r.RivalLead > 0f)
+                    verdict = "cao hơn đề bài " + Pct(r.RivalLead) + " (≤ " + Pct(r.RivalMargin) +
+                              ") → sát nút, vẫn tính là đề bài";
+                else
+                    verdict = "đề bài cao hơn " + Pct(-r.RivalLead) + " → không ảnh hưởng";
+                sb.AppendLine("Nguyên liệu khác gần nhất: " + r.Rival + " " + Pct(r.RivalTotal) + " — " + verdict);
+            }
+            if (r.ShapeCapped)
                 sb.AppendLine("  Hình dưới ngưỡng tối thiểu " + Pct(minShape) + " → điểm bị chặn tối đa " + Pct(shapeCap));
             return sb.ToString();
         }

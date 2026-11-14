@@ -672,14 +672,18 @@ namespace ColorFood.Drawing
         /// <summary>
         /// Chấm kiểu ẢNH MÀU (SketchScorer): hình theo đường bao cả bức + màu theo vị
         /// trí so với mẫu tô sẵn. Không phân biệt viền / tô, không phụ thuộc thứ tự vẽ.
+        /// rivals: các nguyên liệu khác trong game — bức vẽ giống một nguyên liệu khác
+        /// rõ rệt hơn đề bài (vd vẽ ớt chuông khi đề là cà chua) thì không đạt.
         /// null nếu chưa vẽ gì / thiếu template hoặc palette.
         /// </summary>
-        public SketchResult ScoreSketch(IngredientTemplate template, PDollarRecognizer recognizer)
+        public SketchResult ScoreSketch(IngredientTemplate template, PDollarRecognizer recognizer,
+                                        IEnumerable<IngredientTemplate> rivals = null)
         {
             if (template == null || !HasPalette) return null;
             return SketchScorer.Score(BuildSketch(), template.GetSketchShapes(), recognizer, palette.Table,
                                       template.sketchMaxDistance, template.shapeWeight,
-                                      template.minColorCoverage, template.minShape, template.shapeCap);
+                                      template.minColorCoverage, template.minShape, template.shapeCap,
+                                      IngredientTemplate.ToRivals(template, rivals));
         }
 
         /// <summary>

@@ -266,7 +266,7 @@ namespace ColorFood.EditorTools
 
             EditorGUILayout.LabelField(
                 $"{_loaded.ingredientId}  |  {_loaded.VariantCount} mẫu vẽ → " +
-                $"{_loaded.GetSketchShapes().Count} biến thể (cả xoay/lật)  |  " +
+                $"{_loaded.GetSketchShapes().Count} biến thể (cả bản lật)  |  " +
                 $"sketchMaxDistance hiện tại: {_loaded.sketchMaxDistance:F3}",
                 EditorStyles.miniBoldLabel);
 
@@ -317,7 +317,9 @@ namespace ColorFood.EditorTools
             // Chấm giống hệt trong game: ảnh màu so với mọi biến thể của mẫu
             SketchResult r = SketchScorer.Score(BuildColorSketch(_test), _loaded.GetSketchShapes(), _recognizer,
                                                 _palette.Table, _loaded.sketchMaxDistance, _loaded.shapeWeight,
-                                                _loaded.minColorCoverage, _loaded.minShape, _loaded.shapeCap);
+                                                _loaded.minColorCoverage, _loaded.minShape, _loaded.shapeCap,
+                                                IngredientTemplate.ToRivals(_loaded, AllTemplates()),
+                                                _loaded.rivalMargin, _loaded.shapeCap);
             if (r == null) return;
 
             _lastDistance = r.Distance;
@@ -329,6 +331,18 @@ namespace ColorFood.EditorTools
 
             _test.Clear();
             Repaint();
+        }
+
+        /// <summary>Mọi IngredientTemplate trong project — để so với nguyên liệu khác khi thử chấm.</summary>
+        private static List<IngredientTemplate> AllTemplates()
+        {
+            var list = new List<IngredientTemplate>();
+            foreach (string guid in AssetDatabase.FindAssets("t:IngredientTemplate"))
+            {
+                var t = AssetDatabase.LoadAssetAtPath<IngredientTemplate>(AssetDatabase.GUIDToAssetPath(guid));
+                if (t != null) list.Add(t);
+            }
+            return list;
         }
 
         private void DrawTestResults()

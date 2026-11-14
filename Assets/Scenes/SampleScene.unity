@@ -292,6 +292,11 @@ MonoBehaviour:
   palette: {fileID: 0}
   ingredients:
   - {fileID: 11400000, guid: 5cf8f046806f3834792f22c126198876, type: 2}
+  - {fileID: 11400000, guid: 5c3c26dab517cc0498c60830df019d36, type: 2}
+  - {fileID: 11400000, guid: af84418828a9c0e4a9d9941c14aac147, type: 2}
+  - {fileID: 11400000, guid: 1d44533cd72a5d849851842234dee41a, type: 2}
+  - {fileID: 11400000, guid: 78ff25b4cabe8644a9a3bb9c7c359100, type: 2}
+  - {fileID: 11400000, guid: d787b1da451b41f49a1b9ead93641637, type: 2}
   passThreshold: 0.7
   csvFileName: scoring_log.csv
 --- !u!1 &519420028

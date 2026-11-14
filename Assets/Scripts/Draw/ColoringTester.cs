@@ -147,7 +147,8 @@ namespace ColorFood.Drawing
         {
             var t = Current;
             // Cách chấm chính: ảnh màu (không phân biệt viền / tô)
-            SketchResult sk = canvas.ScoreSketch(t, _recognizer);
+            // so với mọi nguyên liệu khác trong danh sách: vẽ ớt chuông khi đề là cà chua thì không đạt
+            SketchResult sk = canvas.ScoreSketch(t, _recognizer, ingredients);
             // Cách cũ (vùng kín + đoán viền/tô) — in kèm để so sánh
             ScoreResult r = canvas.ScoreIngredient(t, _recognizer, out float d);
             if (sk == null && r == null)
