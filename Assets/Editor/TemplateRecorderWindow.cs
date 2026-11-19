@@ -18,7 +18,7 @@ namespace ColorFood.EditorTools
     ///      liệu có thể có NHIỀU MẪU: lưu vào asset đã có thì chọn "Thêm làm
     ///      mẫu mới" (hoặc ghi đè mẫu đang sửa).
     ///   2. Thử chấm điểm — vẽ thử nhiều lần (bằng cách chấm ảnh màu, như trong
-    ///      game) để xem điểm và để tool ĐỀ XUẤT sketchMaxDistance cho nguyên liệu.
+    ///      game) để xem điểm và để tool ĐỀ XUẤT shapeMaxDistance cho nguyên liệu.
     ///
     /// VẼ CÓ MÀU: chọn màu trong bảng rồi vẽ VÀ TÔ luôn bức mẫu (dâu đỏ, lá xanh...):
     /// vẽ viền bằng Bút, rồi dùng Thùng sơn bấm vào bên trong để tô kín (hoặc tăng cỡ bút
@@ -267,7 +267,7 @@ namespace ColorFood.EditorTools
             EditorGUILayout.LabelField(
                 $"{_loaded.ingredientId}  |  {_loaded.VariantCount} mẫu vẽ → " +
                 $"{_loaded.GetSketchShapes().Count} biến thể (cả bản lật)  |  " +
-                $"sketchMaxDistance hiện tại: {_loaded.sketchMaxDistance:F3}",
+                $"shapeMaxDistance hiện tại: {_loaded.shapeMaxDistance:F3}",
                 EditorStyles.miniBoldLabel);
 
             EditorGUILayout.HelpBox(
@@ -315,11 +315,9 @@ namespace ColorFood.EditorTools
             if (_test.Points.Count < 2 || _palette == null) return;
 
             // Chấm giống hệt trong game: ảnh màu so với mọi biến thể của mẫu
-            SketchResult r = SketchScorer.Score(BuildColorSketch(_test), _loaded.GetSketchShapes(), _recognizer,
-                                                _palette.Table, _loaded.sketchMaxDistance, _loaded.shapeWeight,
-                                                _loaded.minColorCoverage, _loaded.minShape, _loaded.shapeCap,
-                                                IngredientTemplate.ToRivals(_loaded, AllTemplates()),
-                                                _loaded.rivalMargin, _loaded.shapeCap);
+            SketchResult r = SketchScorer.Score(BuildColorSketch(_test), _loaded.GetSketchShapes(), _palette.Table,
+                                                _loaded.ToSketchParams(),
+                                                IngredientTemplate.ToRivals(_loaded, AllTemplates()));
             if (r == null) return;
 
             _lastDistance = r.Distance;
@@ -365,7 +363,7 @@ namespace ColorFood.EditorTools
             if (_testDistances.Count < 5)
             {
                 EditorGUILayout.LabelField(
-                    $"Đã chấm {_testDistances.Count} lần. Cần ít nhất 5 lần để đề xuất sketchMaxDistance.",
+                    $"Đã chấm {_testDistances.Count} lần. Cần ít nhất 5 lần để đề xuất shapeMaxDistance.",
                     EditorStyles.miniLabel);
             }
             else
@@ -385,15 +383,15 @@ namespace ColorFood.EditorTools
                     EditorStyles.miniLabel);
 
                 EditorGUILayout.HelpBox(
-                    $"sketchMaxDistance đề xuất: {suggested:F3}\n" +
+                    $"shapeMaxDistance đề xuất: {suggested:F3}\n" +
                     "(với giá trị này, 80% lần vẽ của bạn có điểm HÌNH từ 70% trở lên)",
                     MessageType.None);
 
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Áp dụng vào template"))
                 {
-                    Undo.RecordObject(_loaded, "Set sketchMaxDistance");
-                    _loaded.sketchMaxDistance = Mathf.Round(suggested * 1000f) / 1000f;
+                    Undo.RecordObject(_loaded, "Set shapeMaxDistance");
+                    _loaded.shapeMaxDistance = Mathf.Round(suggested * 1000f) / 1000f;
                     EditorUtility.SetDirty(_loaded);
                     AssetDatabase.SaveAssets();
                 }

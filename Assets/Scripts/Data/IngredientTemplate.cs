@@ -105,9 +105,17 @@ namespace ColorFood.Data
         public PartRule[] parts = new PartRule[0];
 
         [Header("Cách chấm ảnh màu (không phân biệt viền / tô)")]
-        [Tooltip("Khoảng cách $P (giữa ĐƯỜNG BAO hình) ứng với điểm hình = 0. Khác maxDistance " +
-                 "của cách chấm cũ (so từng nét). Hiệu chỉnh bằng tab 'Thử chấm điểm' của Template Recorder.")]
-        public float sketchMaxDistance = 0.12f;
+        [Tooltip("Khoảng cách hình THÂN D (Chamfer p95 + IoU) ứng với điểm hình = 0. " +
+                 "Hiệu chỉnh bằng tab 'Thử chấm điểm' của Template Recorder.")]
+        public float shapeMaxDistance = 0.8f;
+
+        [Tooltip("Trọng số hình của các phần CHI TIẾT (cuống, lá — mọi màu không phải thân). " +
+                 "Tổng = shapeWeight × hình thân + detailWeight × chi tiết + phần còn lại × màu. " +
+                 "Mẫu chỉ một màu: trọng số này dồn sang màu.")]
+        [Range(0f, 0.6f)] public float detailWeight = 0.2f;
+
+        [Tooltip("Độ lệch hình (1 − IoU) của một phần chi tiết ứng với điểm chi tiết = 0.")]
+        [Range(0.2f, 1f)] public float detailMaxDistance = 0.6f;
 
         [Tooltip("Mỗi phần màu của mẫu tô được ≥ tỉ lệ này diện tích thì không bị trừ điểm phủ.")]
         [Range(0.1f, 1f)] public float minColorCoverage = 0.6f;
@@ -221,6 +229,22 @@ namespace ColorFood.Data
             return _sketchShapes;
         }
 
+        /// <summary>Tên hiển thị cho người chơi (displayName, trống thì dùng ingredientId).</summary>
+        public string DisplayNameOrId => string.IsNullOrEmpty(displayName) ? ingredientId : displayName;
+
+        /// <summary>Thông số chấm ảnh màu của nguyên liệu này.</summary>
+        public SketchParams ToSketchParams() => new SketchParams
+        {
+            ShapeMaxDistance = shapeMaxDistance,
+            DetailMaxDistance = detailMaxDistance,
+            ShapeWeight = shapeWeight,
+            DetailWeight = detailWeight,
+            MinCoverage = minColorCoverage,
+            MinShape = minShape,
+            ShapeCap = shapeCap,
+            RivalMargin = rivalMargin
+        };
+
         /// <summary>
         /// Mẫu của các nguyên liệu KHÁC để so khi chấm (SketchScorer.Rival): bỏ chính
         /// target và các template cùng ingredientId; null nếu không còn ai.
@@ -234,7 +258,7 @@ namespace ColorFood.Data
             {
                 if (t == null || t == target || (target != null && t.ingredientId == target.ingredientId)) continue;
                 var shapes = t.GetSketchShapes();
-                if (shapes.Count > 0) list.Add(new SketchScorer.Rival(t.ingredientId, shapes));
+                if (shapes.Count > 0) list.Add(new SketchScorer.Rival(t.DisplayNameOrId, shapes));
             }
             return list.Count > 0 ? list : null;
         }

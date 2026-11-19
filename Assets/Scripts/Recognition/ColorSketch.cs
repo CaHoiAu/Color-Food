@@ -5,7 +5,7 @@ using System.Text;
 namespace ColorFood.Recognition
 {
     /// <summary>
-    /// Bức vẽ thu nhỏ thành lưới vuông Size×Size, mỗi ô một màu (ColorID trong
+    /// Bức vẽ thu nhỏ thành lưới vuông Size×Size (mặc định 256), mỗi ô một màu (ColorID trong
     /// palette). Đây là đầu vào của cách chấm "ảnh màu" (SketchScorer): không
     /// cần biết nét nào là viền, nét nào là tô — chỉ cần chỗ nào có màu gì.
     ///
@@ -17,7 +17,11 @@ namespace ColorFood.Recognition
     {
         public const int Empty = -1;
         public const int NoColor = -2;
-        public const int DefaultSize = 128;
+        /// <summary>
+        /// 256 (mỗi ô = 2×2 pixel canvas 512): đủ mịn để cuống / lá nhỏ không vỡ hạt khi
+        /// so hình chi tiết. Mẫu cũ lưu ở 128 vẫn đọc được (FromRle nhận kích thước riêng).
+        /// </summary>
+        public const int DefaultSize = 256;
 
         public readonly int Size;
         public readonly int[] Cells;
@@ -101,7 +105,7 @@ namespace ColorFood.Recognition
         /// useColors = false → mọi ô là NoColor (chỉ dùng cho hình).
         /// </summary>
         public static ColorSketch FromStrokes(IReadOnlyList<Point> pts, int size = DefaultSize,
-                                              int radius = 2, bool useColors = false)
+                                              int radius = 4, bool useColors = false)
         {
             var sketch = new ColorSketch(size);
             if (pts == null || pts.Count == 0) return sketch;

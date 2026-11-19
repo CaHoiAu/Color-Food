@@ -931,8 +931,6 @@ MonoBehaviour:
     ColorID: 0
   strokeCount: 4
   extraVariants: []
-  autoRotateMax: 30
-  autoRotateStep: 15
   autoMirror: 1
   shapeWeight: 0.4
   missingPartCap: 0.5
@@ -940,8 +938,11 @@ MonoBehaviour:
   shapeCap: 0.5
   roundnessCap: 0.5
   parts: []
-  sketchMaxDistance: 0.12
+  shapeMaxDistance: 0.8
+  detailWeight: 0.2
+  detailMaxDistance: 0.6
   minColorCoverage: 0.6
+  rivalMargin: 0.05
   colorMap: 
   colorMapSize: 0
   notes: 

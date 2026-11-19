@@ -110,6 +110,9 @@ namespace ColorFood.Drawing
         public int StrokeCount => _strokeId + (_hasLastPos ? 1 : 0);
 
         public Tool CurrentTool { get; private set; } = Tool.Draw;
+
+        /// <summary>false = khóa thao tác vẽ (vd màn nhận đơn / kết quả); hình vẫn hiển thị và cập nhật.</summary>
+        public bool InputEnabled { get; set; } = true;
         public int CurrentColorId { get; private set; }
         public ColorPaletteAsset Palette => palette;
 
@@ -165,6 +168,7 @@ namespace ColorFood.Drawing
 
         public void OnPointerDown(PointerEventData e)
         {
+            if (!InputEnabled) return;
             if (!TryGetCanvasPosition(e, out Vector2 pos)) return;
 
             if (CurrentTool == Tool.Fill)
@@ -191,6 +195,7 @@ namespace ColorFood.Drawing
 
         public void OnDrag(PointerEventData e)
         {
+            if (!InputEnabled) return;
             if (CurrentTool == Tool.Fill) return;
             if (!TryGetCanvasPosition(e, out Vector2 pos)) return;
 
@@ -482,6 +487,7 @@ namespace ColorFood.Drawing
                 _paint[i] = -1;
             }
 
+            ClearOverride();
             _points.Clear();
             _crayonStroke.Clear();
             _events.Clear();
@@ -494,6 +500,36 @@ namespace ColorFood.Drawing
         }
 
         public void SetBrushColor(Color c) => brushColor = c;
+
+        /// <summary>Bản sao hình đang hiển thị trên canvas (nét sáp như người chơi thấy).</summary>
+        public Texture2D CaptureTexture()
+        {
+            var copy = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false)
+            { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            copy.SetPixels32(_pixels);
+            copy.Apply();
+            return copy;
+        }
+
+        /// <summary>
+        /// Hiện một hình khác thay cho bức vẽ (vd dạng hoàn thiện, phủ cả khung canvas).
+        /// Dữ liệu chấm điểm không đổi. Clear() hoặc ClearOverride() trả lại bức vẽ.
+        /// </summary>
+        public void ShowOverride(Texture tex)
+        {
+            if (_image != null && tex != null) _image.texture = tex;
+        }
+
+        public void ClearOverride()
+        {
+            if (_image != null) _image.texture = _texture;
+        }
+
+        /// <summary>Ẩn / hiện canvas trên màn hình (vd khi vào bếp).</summary>
+        public void SetVisible(bool visible)
+        {
+            if (_image != null) _image.enabled = visible;
+        }
 
         public void SetTool(Tool tool) => CurrentTool = tool;
 
@@ -670,20 +706,18 @@ namespace ColorFood.Drawing
         public ColorSketch BuildSketch() => ColorSketch.FromPaint(_paint, textureSize, textureSize);
 
         /// <summary>
-        /// Chấm kiểu ẢNH MÀU (SketchScorer): hình theo đường bao cả bức + màu theo vị
-        /// trí so với mẫu tô sẵn. Không phân biệt viền / tô, không phụ thuộc thứ tự vẽ.
+        /// Chấm kiểu ẢNH MÀU (SketchScorer): hình thân (Chamfer + IoU) + hình chi tiết
+        /// (cuống, lá) + màu theo vị trí so với mẫu tô sẵn. Không phân biệt viền / tô, không phụ thuộc thứ tự vẽ.
         /// rivals: các nguyên liệu khác trong game — bức vẽ giống một nguyên liệu khác
         /// rõ rệt hơn đề bài (vd vẽ ớt chuông khi đề là cà chua) thì không đạt.
         /// null nếu chưa vẽ gì / thiếu template hoặc palette.
         /// </summary>
-        public SketchResult ScoreSketch(IngredientTemplate template, PDollarRecognizer recognizer,
+        public SketchResult ScoreSketch(IngredientTemplate template,
                                         IEnumerable<IngredientTemplate> rivals = null)
         {
             if (template == null || !HasPalette) return null;
-            return SketchScorer.Score(BuildSketch(), template.GetSketchShapes(), recognizer, palette.Table,
-                                      template.sketchMaxDistance, template.shapeWeight,
-                                      template.minColorCoverage, template.minShape, template.shapeCap,
-                                      IngredientTemplate.ToRivals(template, rivals));
+            return SketchScorer.Score(BuildSketch(), template.GetSketchShapes(), palette.Table,
+                                      template.ToSketchParams(), IngredientTemplate.ToRivals(template, rivals));
         }
 
         /// <summary>

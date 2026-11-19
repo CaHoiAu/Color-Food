@@ -29,7 +29,7 @@ namespace ColorFood.Drawing
     ///
     /// CSV scoring_log.csv nằm cạnh calibration.csv (đường dẫn in ra Console):
     /// time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner,
-    /// sketchD,sketchShape,sketchColor,sketchCoverage,sketchTotal   (5 cột cuối: cách chấm ảnh màu — điểm chính)
+    /// sketchD,sketchShape,sketchDetail,sketchColor,sketchCoverage,sketchTotal   (6 cột cuối: cách chấm ảnh màu — điểm chính)
     /// (circOuter/circInner = độ tròn thô, spikeOuter/spikeInner = độ gai của lòng trắng/lòng đỏ,
     ///  dùng để hiệu chỉnh minRoundness / maxSpikiness.
     ///  Header đổi nên file cũ tự được cất thành scoring_log.csv.old-... và tạo file mới.)
@@ -46,7 +46,7 @@ namespace ColorFood.Drawing
 
         private const string CsvHeader =
             "time,ingredient,strokes,rawPoints,d,shape,parts,total,capped,outerRegions,innerRegions,circOuter,circInner,spikeOuter,spikeInner," +
-            "sketchD,sketchShape,sketchColor,sketchCoverage,sketchTotal";
+            "sketchD,sketchShape,sketchDetail,sketchColor,sketchCoverage,sketchTotal";
 
         private readonly PDollarRecognizer _recognizer = new PDollarRecognizer();
         private int _index;
@@ -148,7 +148,7 @@ namespace ColorFood.Drawing
             var t = Current;
             // Cách chấm chính: ảnh màu (không phân biệt viền / tô)
             // so với mọi nguyên liệu khác trong danh sách: vẽ ớt chuông khi đề là cà chua thì không đạt
-            SketchResult sk = canvas.ScoreSketch(t, _recognizer, ingredients);
+            SketchResult sk = canvas.ScoreSketch(t, ingredients);
             // Cách cũ (vùng kín + đoán viền/tô) — in kèm để so sánh
             ScoreResult r = canvas.ScoreIngredient(t, _recognizer, out float d);
             if (sk == null && r == null)
@@ -191,11 +191,12 @@ namespace ColorFood.Drawing
             {
                 row.Append(',').Append(sk.Distance.ToString("F5", CultureInfo.InvariantCulture));
                 row.Append(',').Append(sk.Shape.ToString("F4", CultureInfo.InvariantCulture));
+                row.Append(',').Append(sk.Detail.ToString("F4", CultureInfo.InvariantCulture));
                 row.Append(',').Append(sk.Color.ToString("F4", CultureInfo.InvariantCulture));
                 row.Append(',').Append(sk.Coverage.ToString("F4", CultureInfo.InvariantCulture));
                 row.Append(',').Append(sk.Total.ToString("F4", CultureInfo.InvariantCulture));
             }
-            else row.Append(",,,,,");
+            else row.Append(",,,,,,");
             File.AppendAllText(_csvPath, row + "\n", new UTF8Encoding(false));
         }
 

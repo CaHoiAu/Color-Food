@@ -12,13 +12,11 @@ public class SketchTests
     private const int W = 512;
     private const int Red = 5, Green = 11, Blue = 15;
     private ColorTable _colors;
-    private PDollarRecognizer _recognizer;
 
     [SetUp]
     public void Setup()
     {
         _colors = new ColorTable(DefaultPalette.Names, DefaultPalette.Colors);
-        _recognizer = new PDollarRecognizer();
     }
 
     // ------------------------------------------------------------------
@@ -58,20 +56,22 @@ public class SketchTests
     }
 
     /// <summary>Mẫu: thân đỏ, lá xanh lệch phải phía trên.</summary>
-    private static ColorSketch Template()
+    private static int[] TemplatePaint()
     {
         var p = Blank();
         Solid(p, 256, 230, 140, 140, Red);
         Solid(p, 300, 385, 50, 28, Green);
-        return ColorSketch.FromPaint(p, W, W);
+        return p;
     }
+
+    private static ColorSketch Template() => ColorSketch.FromPaint(TemplatePaint(), W, W);
 
     private List<SketchShape> Prepare(ColorSketch s, bool mirror = true)
         => SketchScorer.PrepareTemplate(s, "tomato", mirror);
 
+    /// <summary>Thông số mặc định của template (shapeMax 0.8, detailMax 0.6, trọng số 0.4 / 0.2 / 0.4).</summary>
     private SketchResult Score(int[] paint, List<SketchShape> template)
-        => SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _recognizer, _colors,
-                              0.12f, 0.4f, 0.6f);
+        => SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _colors, new SketchParams());
 
     /// <summary>Người chơi vẽ cùng hình nhưng nhỏ hơn, ở chỗ khác, bằng viền + tô sáp.</summary>
     private static int[] PlayerTomato(int body = Red, int leaf = Green, int fillPer10 = 7,
@@ -105,7 +105,7 @@ public class SketchTests
             for (int x = 0; x < 4; x++) p[y * W + x] = x < 3 ? Red : Green;   // ô (0,0): 12 đỏ, 4 xanh
         p[10 * W + 10] = Blue;                                                // ô (2,2): 1/16 pixel → trống
 
-        var s = ColorSketch.FromPaint(p, W, W);   // 512 → 128: mỗi ô 4×4 pixel
+        var s = ColorSketch.FromPaint(p, W, W, 128);   // 512 → 128: mỗi ô 4×4 pixel
         Assert.AreEqual(Red, s.Cells[0]);
         Assert.AreEqual(ColorSketch.Empty, s.Cells[2 * 128 + 2]);
     }
@@ -119,16 +119,16 @@ public class SketchTests
     {
         var p = Blank();
         Crayon(p, 256, 256, 150, 150, Red, per10: 3);   // viền + tô thưa
-        var s = ColorSketch.FromPaint(p, W, W);
+        var s = ColorSketch.FromPaint(p, W, W);   // 256×256: mỗi ô 2×2 pixel
         var sil = SketchScorer.Silhouette(SketchScorer.KeptPaint(s), s.Size);
 
-        int c = 64 * 128 + 64;
+        int c = 128 * 256 + 128;
         Assert.IsTrue(sil[c], "giữa hình phải đặc");
-        Assert.IsFalse(sil[2 * 128 + 2], "góc ngoài vẫn trống");
+        Assert.IsFalse(sil[4 * 256 + 4], "góc ngoài vẫn trống");
 
         int filled = 0;
         foreach (bool b in sil) if (b) filled++;
-        double disk = Math.PI * 37.5 * 37.5;   // bán kính 150/4 ô
+        double disk = Math.PI * 75 * 75;   // bán kính 150/2 ô
         Assert.AreEqual(disk, filled, disk * 0.1, "bóng ≈ hình tròn đặc");
     }
 
@@ -141,8 +141,8 @@ public class SketchTests
         var s = ColorSketch.FromPaint(p, W, W);
         var kept = SketchScorer.KeptPaint(s);
 
-        Assert.IsTrue(kept[64 * 128 + 64]);
-        Assert.IsFalse(kept[10 * 128 + 10], "chấm lạc bị bỏ");
+        Assert.IsTrue(kept[128 * 256 + 128]);
+        Assert.IsFalse(kept[20 * 256 + 20], "chấm lạc bị bỏ");
     }
 
     [Test]
@@ -176,7 +176,8 @@ public class SketchTests
         var r = Score(PlayerTomato(), Prepare(Template()));
 
         Assert.IsTrue(r.HasColor);
-        Assert.Greater(r.Shape, 0.7f, r.Report);
+        Assert.Greater(r.Shape, 0.65f, r.Report);
+        Assert.Greater(r.Detail, 0.8f, r.Report);
         Assert.Greater(r.Color, 0.9f, r.Report);
         Assert.Greater(r.Total, 0.8f, r.Report);
     }
@@ -267,14 +268,13 @@ public class SketchTests
     {
         var list = new List<SketchScorer.Rival>();
         foreach (var r in rivals) list.Add(new SketchScorer.Rival(r.name, r.shapes));
-        return SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _recognizer, _colors,
-                                  0.12f, 0.4f, 0.6f, rivals: list);
+        return SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _colors, new SketchParams(), list);
     }
 
     /// <summary>Chấm có ngưỡng hình tối thiểu 0.5 như template mặc định trong game.</summary>
     private SketchResult ScoreGated(int[] paint, List<SketchShape> template)
-        => SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _recognizer, _colors,
-                              0.12f, 0.4f, 0.6f, minShape: 0.5f);
+        => SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), template, _colors,
+                              new SketchParams { MinShape = 0.5f });
 
     [Test]
     public void Rival_PepperDrawn_TomatoTargetAlone_FailsByElongation()
@@ -346,12 +346,13 @@ public class SketchTests
     }
 
     [Test]
-    public void Rival_PepperDrawn_TomatoTarget_IsCapped()
+    public void Rival_PepperDrawn_TomatoTarget_IsNotAccepted()
     {
         var r = ScoreVs(PlayerPepper(), Prepare(Template()), ("pepper", Prepare(PepperTemplate())));
 
         Assert.AreEqual("pepper", r.Rival, r.Report);
-        Assert.IsTrue(r.RivalCapped, r.Report);
+        Assert.Greater(r.RivalLead, 0.05f, "ớt chuông phải cao hơn đề cà chua rõ rệt. " + r.Report);
+        // Hình thân + chi tiết đã kéo tổng xuống dưới mức chặn — không cần chặn nữa
         Assert.LessOrEqual(r.Total, 0.5f, r.Report);
     }
 
@@ -382,5 +383,63 @@ public class SketchTests
 
         Assert.IsFalse(r.RivalCapped, r.Report);
         Assert.AreEqual("", r.Rival, "mẫu không màu không được tính là nguyên liệu khác");
+    }
+
+    // ------------------------------------------------------------------
+    // Hình thân (Chamfer + IoU) và hình chi tiết (cuống, lá)
+    // ------------------------------------------------------------------
+
+    [Test]
+    public void Shape_SameAsTemplate_IsPerfect()
+    {
+        var r = Score(TemplatePaint(), Prepare(Template()));
+
+        Assert.AreEqual(0f, r.Chamfer, 1e-5f, r.Report);
+        Assert.AreEqual(0f, r.IouDistance, 1e-5f, r.Report);
+        Assert.AreEqual(1f, r.Detail, 1e-5f, r.Report);
+        Assert.Greater(r.Total, 0.99f, r.Report);
+    }
+
+    [Test]
+    public void Shape_IouDistance_And_Chamfer_Basics()
+    {
+        var a = new bool[16];
+        var b = new bool[16];
+        for (int i = 0; i < 8; i++) a[i] = true;
+        for (int i = 4; i < 12; i++) b[i] = true;
+        Assert.AreEqual(1f - 4f / 12f, SketchScorer.IouDistance(a, b), 1e-6f);
+        Assert.AreEqual(1f, SketchScorer.IouDistance(new bool[16], new bool[16]));
+
+        var p = new[] { new Point(0, 0, 0), new Point(1, 0, 0) };
+        var q = new[] { new Point(0, 0.5f, 0), new Point(1, 0.5f, 0) };
+        Assert.AreEqual(0.5f, SketchScorer.Chamfer95(p, q), 1e-5f);
+    }
+
+    [Test]
+    public void Detail_LeafDrawnAsStick_IsRejected()
+    {
+        // Thân đúng, nhưng lá vẽ thành que dọc thay vì lá bầu dục
+        var p = Blank();
+        Crayon(p, 220, 250, 98, 98, Red);
+        for (int y = 331; y < 390; y++)
+            for (int x = 246; x <= 256; x++) p[y * W + x] = Green;
+        var r = Score(p, Prepare(Template()));
+
+        Assert.AreEqual(1, r.DetailParts.Count, r.Report);
+        Assert.Less(r.Detail, 0.3f, r.Report);
+        Assert.Less(r.Total, 0.7f, r.Report);
+    }
+
+    [Test]
+    public void Detail_LeafMissing_ScoresZero()
+    {
+        var p = Blank();
+        Crayon(p, 220, 250, 98, 98, Red);
+        var r = Score(p, Prepare(Template()));
+
+        Assert.AreEqual(1, r.DetailParts.Count);
+        Assert.IsTrue(r.DetailParts[0].Missing, r.Report);
+        Assert.AreEqual(0f, r.Detail, 1e-6f);
+        Assert.Less(r.Total, 0.5f, r.Report);
     }
 }
