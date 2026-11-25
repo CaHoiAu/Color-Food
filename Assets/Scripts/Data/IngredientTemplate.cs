@@ -117,6 +117,21 @@ namespace ColorFood.Data
         [Tooltip("Độ lệch hình (1 − IoU) của một phần chi tiết ứng với điểm chi tiết = 0.")]
         [Range(0.2f, 1f)] public float detailMaxDistance = 0.6f;
 
+        [Tooltip("Chi tiết lệch hình tới mức này (1 − IoU) vẫn đủ điểm — chỉ cần đúng KIỂU dáng, " +
+                 "không cần giống hệt mẫu. 0 = đòi khớp sát.")]
+        [Range(0f, 0.4f)] public float detailTolerance = 0.12f;
+
+        [Tooltip("Khi so chi tiết, chấp nhận chi tiết xoay lệch tới ±góc này (độ). " +
+                 "Lớn hơn = khoan dung hơn, nhưng chi tiết của các quả na ná nhau dễ bị coi là cùng kiểu.")]
+        [Range(0f, 45f)] public float detailRotation = 15f;
+
+        [Tooltip("…và dài / ngắn hơn mẫu tới ±tỉ lệ này.")]
+        [Range(0f, 0.3f)] public float detailStretch = 0.08f;
+
+        [Tooltip("Chi tiết có cánh nhọn (vd lá đài cà chua): vẽ cũng có cánh nhọn thì được điểm này, " +
+                 "không cần đúng số cánh như mẫu. 0 = tắt (phải khớp số cánh).")]
+        [Range(0f, 1f)] public float spikyDetailCredit = 0.9f;
+
         [Tooltip("Mỗi phần màu của mẫu tô được ≥ tỉ lệ này diện tích thì không bị trừ điểm phủ.")]
         [Range(0.1f, 1f)] public float minColorCoverage = 0.6f;
 
@@ -237,6 +252,10 @@ namespace ColorFood.Data
         {
             ShapeMaxDistance = shapeMaxDistance,
             DetailMaxDistance = detailMaxDistance,
+            DetailTolerance = detailTolerance,
+            DetailRotation = detailRotation,
+            DetailStretch = detailStretch,
+            SpikyDetailCredit = spikyDetailCredit,
             ShapeWeight = shapeWeight,
             DetailWeight = detailWeight,
             MinCoverage = minColorCoverage,

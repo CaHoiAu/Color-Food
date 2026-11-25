@@ -442,4 +442,147 @@ public class SketchTests
         Assert.AreEqual(0f, r.Detail, 1e-6f);
         Assert.Less(r.Total, 0.5f, r.Report);
     }
+
+    // ------------------------------------------------------------------
+    // Chi tiết chấm theo KIỂU DÁNG, không đòi giống hệt mẫu
+    // ------------------------------------------------------------------
+
+    /// <summary>Thân cà chua (sáp) + một phần xanh do fill vẽ.</summary>
+    private static int[] TomatoWith(Action<int[]> detail)
+    {
+        var p = Blank();
+        Crayon(p, 220, 250, 98, 98, Red);
+        detail(p);
+        return p;
+    }
+
+    /// <summary>Lá bầu dục xoay deg độ: viền ~6px + tô sọc kiểu sáp.</summary>
+    private static void Leaf(int[] p, float cx, float cy, float rx, float ry, float deg = 0f)
+    {
+        double a = deg * Math.PI / 180, cos = Math.Cos(a), sin = Math.Sin(a);
+        for (int y = 0; y < W; y++)
+            for (int x = 0; x < W; x++)
+            {
+                double xr = (x - cx) * cos + (y - cy) * sin, yr = -(x - cx) * sin + (y - cy) * cos;
+                double e = Math.Pow(xr / rx, 2) + Math.Pow(yr / ry, 2);
+                if (e <= 1 && (e >= Math.Pow(1 - 6.0 / Math.Min(rx, ry), 2) || x % 10 < 7)) p[y * W + x] = Green;
+            }
+    }
+
+    [Test]
+    public void Detail_SameKindLeaf_Variations_GetFullCredit()
+    {
+        var t = Prepare(Template());
+        var longer = Score(TomatoWith(p => Leaf(p, 251, 358, 40, 17)), t);
+        var tilted = Score(TomatoWith(p => Leaf(p, 251, 358, 35, 20, 25)), t);
+        var tiltedBack = Score(TomatoWith(p => Leaf(p, 251, 358, 35, 20, -30)), t);
+
+        Assert.Greater(longer.Detail, 0.95f, longer.Report);
+        Assert.Greater(tilted.Detail, 0.95f, tilted.Report);
+        Assert.Greater(tiltedBack.Detail, 0.85f, tiltedBack.Report);
+    }
+
+    [Test]
+    public void Detail_DifferentKinds_StayLow()
+    {
+        var t = Prepare(Template());
+        var round = Score(TomatoWith(p => Leaf(p, 251, 358, 24, 24)), t);
+        var star = Score(TomatoWith(p =>
+        {
+            for (int y = 0; y < W; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    double r = Math.Sqrt((x - 251.0) * (x - 251.0) + (y - 358.0) * (y - 358.0));
+                    double th = Math.Atan2(y - 358.0, x - 251.0);
+                    if (r <= 34 * (0.55 + 0.45 * Math.Cos(5 * th))) p[y * W + x] = Green;
+                }
+        }), t);
+
+        Assert.Less(round.Detail, 0.45f, "cục tròn không phải kiểu lá bầu dục. " + round.Report);
+        Assert.Less(round.DetailParts[0].ElongationFactor, 0.6f, round.Report);
+        Assert.Less(star.Detail, 0.25f, "hình sao không phải kiểu lá bầu dục. " + star.Report);
+    }
+
+    [Test]
+    public void Detail_StrictSettings_RequireCloseMatch()
+    {
+        // Đặt chặt (cho nguyên liệu dễ nhầm): lá nghiêng -30° bị trừ điểm rõ hơn
+        var t = Prepare(Template());
+        var paint = TomatoWith(p => Leaf(p, 251, 358, 35, 20, -30));
+        var lenient = Score(paint, t);
+        var strict = SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), t, _colors,
+                                        new SketchParams { DetailTolerance = 0f, DetailRotation = 0f, DetailStretch = 0f });
+        Assert.Less(strict.Detail, lenient.Detail - 0.2f, strict.Report);
+    }
+
+    // ------------------------------------------------------------------
+    // Chi tiết có cánh nhọn: không bắt đúng số cánh
+    // ------------------------------------------------------------------
+
+    /// <summary>Lá đài n cánh nhọn, tâm (cx, cy), bán kính R, cánh hướng lên.</summary>
+    private static void Calyx(int[] p, float cx, float cy, float R, int n)
+    {
+        for (int y = 0; y < W; y++)
+            for (int x = 0; x < W; x++)
+            {
+                double r = Math.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+                double th = Math.Atan2(y - cy, x - cx) - Math.PI / 2;
+                double k = Math.Max(0, Math.Cos(n * th));
+                if (r <= R * (0.35 + 0.65 * k * k)) p[y * W + x] = Green;
+            }
+    }
+
+    private static List<SketchShape> CalyxTemplate()
+    {
+        var p = Blank();
+        Solid(p, 256, 230, 140, 140, Red);
+        Calyx(p, 256, 372, 48, 3);
+        return SketchScorer.PrepareTemplate(ColorSketch.FromPaint(p, W, W), "tomato", true);
+    }
+
+    [Test]
+    public void Spiky_MoreSpikesThanTemplate_StillSameKind()
+    {
+        var t = CalyxTemplate();
+        var five = Score(TomatoWith(p => Calyx(p, 220, 330, 34, 5)), t);
+
+        Assert.Greater(five.Detail, 0.85f, five.Report);
+        Assert.IsTrue(five.DetailParts[0].SpikyMatch, five.Report);
+    }
+
+    [Test]
+    public void Spiky_SmoothDetail_IsNotSameKind()
+    {
+        var t = CalyxTemplate();
+        var leaf = Score(TomatoWith(p => Leaf(p, 251, 358, 35, 20)), t);
+
+        Assert.Less(leaf.Detail, 0.2f, "lá bầu dục trơn không phải kiểu lá đài có cánh. " + leaf.Report);
+        Assert.IsFalse(leaf.DetailParts[0].SpikyMatch);
+    }
+
+    [Test]
+    public void Spiky_CreditOff_RequiresMatchingSpikes()
+    {
+        var t = CalyxTemplate();
+        var paint = TomatoWith(p => Calyx(p, 220, 330, 34, 5));
+        var strict = SketchScorer.Score(ColorSketch.FromPaint(paint, W, W), t, _colors,
+                                        new SketchParams { SpikyDetailCredit = 0f });
+        Assert.Less(strict.Detail, 0.3f, strict.Report);
+    }
+
+    [Test]
+    public void Solidity_Basics()
+    {
+        var square = new List<Point>();
+        for (int y = 0; y < 10; y++)
+            for (int x = 0; x < 10; x++) square.Add(new Point(x + 0.5f, y + 0.5f, 0));
+        Assert.AreEqual(1f, SketchScorer.SolidityOf(square), 1e-4f);
+
+        // Chữ L: 3 cạnh 10×2 ghép lại → lõm rõ
+        var ell = new List<Point>();
+        for (int y = 0; y < 10; y++)
+            for (int x = 0; x < 10; x++)
+                if (x < 2 || y < 2) ell.Add(new Point(x + 0.5f, y + 0.5f, 0));
+        Assert.Less(SketchScorer.SolidityOf(ell), 0.7f);
+    }
 }

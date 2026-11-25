@@ -10,9 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 97bb9396ed891934b9ece0c58b0f6417, type: 3}
-  m_Name: TomatoCarrot
+  m_Name: TomatoBellpepper
   m_EditorClassIdentifier: 
-  dishName: Salad Tomato Carrot
+  dishName: Ramen Tomato Bellpepper
+  dishImage: {fileID: 2800000, guid: 7428367d9a170cb47aab555254518513, type: 3}
   ingredients:
-  - {fileID: 11400000, guid: af84418828a9c0e4a9d9941c14aac147, type: 2}
   - {fileID: 11400000, guid: 5cf8f046806f3834792f22c126198876, type: 2}
+  - {fileID: 11400000, guid: 5c3c26dab517cc0498c60830df019d36, type: 2}

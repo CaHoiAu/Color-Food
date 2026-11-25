@@ -24,6 +24,10 @@ namespace ColorFood.Recognition
     {
         public int ColorId;
         public bool[] Mask;
+        /// <summary>Độ thon dài của phần chi tiết trong mẫu (lá dài, nắp bè, cục tròn…).</summary>
+        public float Elongation = 1f;
+        /// <summary>Độ đặc = diện tích / diện tích bao lồi: thấp = có cánh nhọn (lá đài cà chua).</summary>
+        public float Solidity = 1f;
     }
 
     /// <summary>Điểm màu của một màu trong mẫu (vd: phần đỏ, phần xanh).</summary>
@@ -49,6 +53,10 @@ namespace ColorFood.Recognition
         /// <summary>1 − IoU giữa hình phần đó của bức vẽ và của mẫu (0 = trùng).</summary>
         public float Distance;
         public float Score;
+        /// <summary>Hệ số độ thon dài của phần chi tiết (1 = cùng kiểu dài / tròn với mẫu).</summary>
+        public float ElongationFactor = 1f;
+        /// <summary>Được tính "cùng kiểu có cánh nhọn" (khác số cánh với mẫu vẫn được).</summary>
+        public bool SpikyMatch;
         /// <summary>Bức vẽ không có phần màu này.</summary>
         public bool Missing;
     }
@@ -60,6 +68,17 @@ namespace ColorFood.Recognition
         public float ShapeMaxDistance = 0.8f;
         /// <summary>1 − IoU của một phần chi tiết ứng với điểm chi tiết = 0.</summary>
         public float DetailMaxDistance = 0.6f;
+        /// <summary>Lệch hình chi tiết (1 − IoU) tới mức này vẫn đủ điểm — chỉ cần đúng KIỂU dáng.</summary>
+        public float DetailTolerance = 0.12f;
+        /// <summary>Khi so chi tiết, thử xoay phần đó của bức vẽ trong ±góc này (độ, bước 15°).</summary>
+        public float DetailRotation = 15f;
+        /// <summary>…và kéo giãn ±tỉ lệ này (giữ diện tích): lá dài / ngắn hơn chút vẫn là lá.</summary>
+        public float DetailStretch = 0.08f;
+        /// <summary>
+        /// Chi tiết có cánh nhọn (lá đài cà chua): vẽ cũng có cánh nhọn và đúng kiểu dài / tròn
+        /// thì được điểm này, bất kể số cánh. 0 = tắt (phải khớp số cánh như mẫu).
+        /// </summary>
+        public float SpikyDetailCredit = 0.9f;
         public float ShapeWeight = 0.4f;
         public float DetailWeight = 0.2f;
         public float MinCoverage = 0.6f;
@@ -113,6 +132,14 @@ namespace ColorFood.Recognition
     ///         chi tiết = cuống, lá…) được so riêng: lấy các ô cùng màu (hoặc gần màu)
     ///         của bức vẽ, chuẩn hóa riêng phần đó, so bằng 1 − IoU. Quả có thân na ná
     ///         nhau (táo / ớt chuông / cà chua) khác nhau rõ nhất ở chỗ này.
+    ///         Chấm theo KIỂU DÁNG, không đòi giống hệt: thử xoay ±DetailRotation và
+    ///         kéo giãn ±DetailStretch phần đó, lấy lần khớp nhất; lệch ≤ DetailTolerance
+    ///         vẫn đủ điểm; × hệ số độ thon dài riêng của chi tiết (lá phải dài, nắp bè,
+    ///         cục tròn là kiểu khác). Càng khoan dung thì chi tiết của các quả na ná
+    ///         nhau càng dễ bị coi là cùng kiểu — nguyên liệu dễ nhầm nên đặt chặt hơn.
+    ///         Chi tiết CÓ CÁNH NHỌN (độ đặc &lt; SpikySolidity, vd lá đài cà chua): vẽ cũng
+    ///         có cánh nhọn + đúng kiểu dài / tròn → ít nhất SpikyDetailCredit, KHÔNG quan
+    ///         tâm số cánh (mẫu 3 cánh, vẽ 5 cánh vẫn được). Chi tiết trơn không áp dụng.
     ///   MÀU:  co bức vẽ (theo khung bao các ô có màu) về lưới GridSize×GridSize,
     ///         mỗi ô một màu → so từng ô với lưới của MẪU TÔ SẴN cùng vị trí (cho
     ///         lệch 1 ô). Mỗi màu của mẫu là một phần, trọng số NGANG NHAU.
@@ -142,6 +169,15 @@ namespace ColorFood.Recognition
         public const float ChamferScale = 0.2f, IouScale = 0.4f;
         /// <summary>Một màu là "chi tiết" khi có ≥ tỉ lệ này số ô có màu của mẫu (và ≥ 4 ô).</summary>
         public const float DetailMinShare = 0.01f;
+        /// <summary>Độ thon dài chi tiết lệch mẫu tới tỉ lệ này: không phạt; tới DetailElongationLimit: về 0.</summary>
+        public const float DetailElongationTolerance = 1.4f, DetailElongationLimit = 2f;
+        public const float DetailRotationStep = 15f;
+        /// <summary>
+        /// Độ đặc dưới mức này = chi tiết "có cánh nhọn". Đo: lá đài 3–6 cánh 0.37–0.62;
+        /// lá bầu dục 0.85, cục tròn 0.83; phần xanh mẫu thật của bạn: nắp + cuống ớt 0.77,
+        /// cuống + lá táo 0.78 — phải nằm TRÊN ngưỡng, nếu không hai quả này bị coi là cùng kiểu.
+        /// </summary>
+        public const float SpikySolidity = 0.70f;
         /// <summary>Ô của bức vẽ được tính vào một phần chi tiết khi màu giống màu phần đó ≥ mức này.</summary>
         public const float DetailColorSimilarity = 0.5f;
         public const float MinComponentShare = 0.03f;
@@ -256,12 +292,72 @@ namespace ColorFood.Recognition
             return small <= 1e-9 ? 100f : (float)Math.Sqrt(big / small);
         }
 
+        /// <summary>Độ thon dài của một tập ô (xem Elongation).</summary>
+        public static float ElongationOf(IReadOnlyList<Point> cells)
+        {
+            if (cells.Count < 2) return 1f;
+            double mx = 0, my = 0;
+            foreach (Point p in cells) { mx += p.X; my += p.Y; }
+            mx /= cells.Count; my /= cells.Count;
+            double cxx = 0, cyy = 0, cxy = 0;
+            foreach (Point p in cells)
+            {
+                double dx = p.X - mx, dy = p.Y - my;
+                cxx += dx * dx; cyy += dy * dy; cxy += dx * dy;
+            }
+            double half = (cxx + cyy) / 2, det = cxx * cyy - cxy * cxy;
+            double root = Math.Sqrt(Math.Max(0, half * half - det));
+            double big = half + root, small = half - root;
+            return small <= 1e-9 ? 100f : (float)Math.Sqrt(big / small);
+        }
+
+        /// <summary>
+        /// Độ đặc của một tập ô = số ô / diện tích bao lồi (bao lồi của 4 góc mỗi ô).
+        /// Hình lồi (tròn, bầu dục) ≈ 1; hình có cánh nhọn / lõm sâu thấp hơn hẳn.
+        /// </summary>
+        public static float SolidityOf(IReadOnlyList<Point> cells)
+        {
+            if (cells.Count < 3) return 1f;
+            var pts = new List<(double x, double y)>(cells.Count * 4);
+            foreach (Point p in cells)
+            {
+                pts.Add((p.X - 0.5, p.Y - 0.5)); pts.Add((p.X + 0.5, p.Y - 0.5));
+                pts.Add((p.X - 0.5, p.Y + 0.5)); pts.Add((p.X + 0.5, p.Y + 0.5));
+            }
+            pts.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+
+            // Bao lồi (monotone chain, Andrew)
+            int n = pts.Count, k = 0;
+            var h = new (double x, double y)[2 * n];
+            for (int i = 0; i < n; i++)
+            {
+                while (k >= 2 && Cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
+                h[k++] = pts[i];
+            }
+            for (int i = n - 2, t = k + 1; i >= 0; i--)
+            {
+                while (k >= t && Cross(h[k - 2], h[k - 1], pts[i]) <= 0) k--;
+                h[k++] = pts[i];
+            }
+            double area = 0;
+            for (int i = 0; i < k - 1; i++) area += h[i].x * h[i + 1].y - h[i + 1].x * h[i].y;
+            area = Math.Abs(area) / 2;
+            return area <= 1e-9 ? 1f : (float)Math.Min(1.0, cells.Count / area);
+
+            double Cross((double x, double y) o, (double x, double y) a, (double x, double y) b)
+                => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+        }
+
         /// <summary>Hệ số nhân vào điểm hình: 1 khi độ thon dài lệch mẫu ≤ ElongationTolerance lần.</summary>
         public static float ElongationFactor(float player, float template)
+            => ElongationFactor(player, template, ElongationTolerance, ElongationLimit);
+
+        /// <summary>1 khi lệch ≤ tolerance lần; giảm tuyến tính theo log, về 0 ở limit lần.</summary>
+        public static float ElongationFactor(float player, float template, float tolerance, float limit)
         {
             if (player <= 0f || template <= 0f) return 1f;
             double e = Math.Abs(Math.Log(player / template));
-            double lo = Math.Log(ElongationTolerance), hi = Math.Log(ElongationLimit);
+            double lo = Math.Log(tolerance), hi = Math.Log(limit);
             if (e <= lo) return 1f;
             return Clamp01((float)(1 - (e - lo) / (hi - lo)));
         }
@@ -645,7 +741,13 @@ namespace ColorFood.Recognition
                     Elongation = f.Elongation
                 };
                 foreach (int c in details)
-                    v.Details.Add(new DetailShape { ColorId = c, Mask = ShapeMask(Flip(byColor[c], flip), DetailSpan) });
+                    v.Details.Add(new DetailShape
+                    {
+                        ColorId = c,
+                        Mask = ShapeMask(Flip(byColor[c], flip), DetailSpan),
+                        Elongation = ElongationOf(byColor[c]),
+                        Solidity = SolidityOf(byColor[c])
+                    });
                 result.Add(v);
             }
             return result;
@@ -672,7 +774,16 @@ namespace ColorFood.Recognition
             public Point[] Boundary;
             public bool[] Mask;
             public int[] Grid;
-            public Dictionary<int, (bool[] mask, int count)> DetailMasks = new Dictionary<int, (bool[], int)>();
+            public Dictionary<int, PlayerDetail> Details = new Dictionary<int, PlayerDetail>();
+        }
+
+        /// <summary>Một phần chi tiết của bức vẽ: mặt nạ ở mọi góc xoay / độ giãn được thử.</summary>
+        private class PlayerDetail
+        {
+            public List<bool[]> Masks = new List<bool[]>();
+            public int Count;
+            public float Elongation = 1f;
+            public float Solidity = 1f;
         }
 
         /// <summary>
@@ -738,16 +849,49 @@ namespace ColorFood.Recognition
             return best;
         }
 
-        /// <summary>Mặt nạ phần chi tiết màu c của bức vẽ: các ô có màu giống c đủ mức (cache theo màu).</summary>
-        private static (bool[] mask, int count) PlayerDetail(PlayerData pd, int c, ColorTable colors)
+        /// <summary>
+        /// Phần chi tiết màu c của bức vẽ (các ô có màu giống c đủ mức), kèm mặt nạ ở mọi
+        /// góc xoay ±DetailRotation (bước 15°) × độ giãn {1 − s, 1, 1 + s} (giữ diện tích).
+        /// Cache theo màu trong một lần chấm.
+        /// </summary>
+        private static PlayerDetail GetPlayerDetail(PlayerData pd, int c, ColorTable colors, SketchParams p)
         {
-            if (pd.DetailMasks.TryGetValue(c, out var cached)) return cached;
+            if (pd.Details.TryGetValue(c, out PlayerDetail cached)) return cached;
             var cells = new List<Point>();
             foreach (Point q in pd.F.Colored)
                 if (q.ColorID >= 0 && colors.Similarity(q.ColorID, c) >= DetailColorSimilarity) cells.Add(q);
-            var result = (ShapeMask(cells, DetailSpan), cells.Count);
-            pd.DetailMasks[c] = result;
-            return result;
+
+            var d = new PlayerDetail { Count = cells.Count, Elongation = ElongationOf(cells), Solidity = SolidityOf(cells) };
+            if (cells.Count >= 3)
+            {
+                double cx = 0, cy = 0;
+                foreach (Point q in cells) { cx += q.X; cy += q.Y; }
+                cx /= cells.Count; cy /= cells.Count;
+
+                var angles = new List<float> { 0f };
+                for (float a = DetailRotationStep; a <= p.DetailRotation + 1e-3f; a += DetailRotationStep)
+                { angles.Add(-a); angles.Add(a); }
+                var stretches = p.DetailStretch > 0f
+                    ? new[] { 1f - p.DetailStretch, 1f, 1f + p.DetailStretch } : new[] { 1f };
+
+                var moved = new Point[cells.Count];
+                foreach (float a in angles)
+                {
+                    double rad = a * Math.PI / 180.0, cos = Math.Cos(rad), sin = Math.Sin(rad);
+                    foreach (float st in stretches)
+                    {
+                        for (int i = 0; i < cells.Count; i++)
+                        {
+                            double x = cells[i].X - cx, y = cells[i].Y - cy;
+                            double xr = x * cos - y * sin, yr = x * sin + y * cos;
+                            moved[i] = new Point((float)(xr * st), (float)(yr / st), 0);
+                        }
+                        d.Masks.Add(ShapeMask(moved, DetailSpan));
+                    }
+                }
+            }
+            pd.Details[c] = d;
+            return d;
         }
 
         /// <summary>Biến thể có tổng cao nhất của một mẫu (chưa áp mức chặn nào).</summary>
@@ -781,10 +925,25 @@ namespace ColorFood.Recognition
                 float detailSum = 0f;
                 foreach (DetailShape ds in v.Details)
                 {
-                    var (mask, count) = PlayerDetail(pd, ds.ColorId, colors);
-                    var dr = new DetailResult { ColorId = ds.ColorId, Missing = count < 3 };
-                    dr.Distance = dr.Missing ? 1f : IouDistance(mask, ds.Mask);
-                    dr.Score = dr.Missing ? 0f : Clamp01(1f - dr.Distance / p.DetailMaxDistance);
+                    PlayerDetail pdet = GetPlayerDetail(pd, ds.ColorId, colors, p);
+                    var dr = new DetailResult { ColorId = ds.ColorId, Missing = pdet.Count < 3, Distance = 1f };
+                    if (!dr.Missing)
+                    {
+                        foreach (bool[] m in pdet.Masks) dr.Distance = Math.Min(dr.Distance, IouDistance(m, ds.Mask));
+                        float span = Math.Max(1e-3f, p.DetailMaxDistance - p.DetailTolerance);
+                        float baseScore = dr.Distance <= p.DetailTolerance ? 1f
+                                        : Clamp01(1f - (dr.Distance - p.DetailTolerance) / span);
+                        dr.ElongationFactor = ElongationFactor(pdet.Elongation, ds.Elongation,
+                                                               DetailElongationTolerance, DetailElongationLimit);
+                        dr.Score = baseScore * dr.ElongationFactor;
+
+                        // Chi tiết có cánh nhọn: cùng kiểu là đủ, không bắt đúng số cánh
+                        if (p.SpikyDetailCredit > 0f && ds.Solidity < SpikySolidity && pdet.Solidity < SpikySolidity)
+                        {
+                            float kind = p.SpikyDetailCredit * dr.ElongationFactor;
+                            if (kind > dr.Score) { dr.Score = kind; dr.SpikyMatch = true; }
+                        }
+                    }
                     detailSum += dr.Score;
                     r.DetailParts.Add(dr);
                 }
@@ -826,7 +985,10 @@ namespace ColorFood.Recognition
                 sb.AppendLine("Hình chi tiết: " + Pct(r.Detail));
                 foreach (DetailResult d in r.DetailParts)
                     sb.AppendLine("  phần " + colors.NameOf(d.ColorId) + ": " + Pct(d.Score) +
-                                  (d.Missing ? " (không vẽ phần này)" : " (lệch hình " + Pct(d.Distance) + ")"));
+                                  (d.Missing ? " (không vẽ phần này)"
+                                   : " (lệch hình " + Pct(d.Distance) + ", miễn trừ ≤ " + Pct(p.DetailTolerance) +
+                                     (d.ElongationFactor < 1f ? ", sai kiểu dài / tròn × " + d.ElongationFactor.ToString("0.00") : "") +
+                                     (d.SpikyMatch ? ", cùng kiểu có cánh nhọn" : "") + ")"));
             }
             if (!r.HasColor)
             {

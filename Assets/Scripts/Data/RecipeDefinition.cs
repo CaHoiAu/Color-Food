@@ -13,6 +13,8 @@ namespace ColorFood.Data
         [Tooltip("Tên món hiện cho người chơi, vd \"Tomato Salad\".")]
         public string dishName = "New Dish";
 
+        public Texture2D dishImage;
+
         [Tooltip("Các nguyên liệu người chơi phải vẽ, theo thứ tự. Mỗi nguyên liệu là một IngredientTemplate đã vẽ có màu.")]
         public List<IngredientTemplate> ingredients = new List<IngredientTemplate>();
 

@@ -129,6 +129,7 @@ namespace ColorFood.EditorTools
         private float _lastTotal = -1f;
 
         private ColorPaletteAsset _palette;
+        private LevelDefinition _testLevel;     // thử chấm như trong level này (chỉ so với nguyên liệu của level)
         private int _colorId = -1;              // -1 = đen, chỉ hình (không màu)
         private PaintTool _tool = PaintTool.Brush;
         private int _brushRadius = DefaultPaintRadius;
@@ -276,6 +277,11 @@ namespace ColorFood.EditorTools
                 "Vẽ 10–20 lần rồi xem đề xuất bên dưới.",
                 MessageType.Info);
 
+            _testLevel = (LevelDefinition)EditorGUILayout.ObjectField(
+                new GUIContent("So trong level", "Chỉ so với nguyên liệu của level này, như khi chơi. " +
+                                                 "Trống = so với mọi template trong project."),
+                _testLevel, typeof(LevelDefinition), false);
+
             DrawPalette();
             DrawTools();
             DrawCanvas(_test);
@@ -317,7 +323,8 @@ namespace ColorFood.EditorTools
             // Chấm giống hệt trong game: ảnh màu so với mọi biến thể của mẫu
             SketchResult r = SketchScorer.Score(BuildColorSketch(_test), _loaded.GetSketchShapes(), _palette.Table,
                                                 _loaded.ToSketchParams(),
-                                                IngredientTemplate.ToRivals(_loaded, AllTemplates()));
+                                                IngredientTemplate.ToRivals(_loaded,
+                                                    _testLevel != null ? _testLevel.Pool() : AllTemplates()));
             if (r == null) return;
 
             _lastDistance = r.Distance;

@@ -9,10 +9,13 @@ namespace ColorFood.Game
     /// <summary>
     /// Vòng chơi: NHẬN ĐƠN MÓN → VẼ TỪNG NGUYÊN LIỆU → KÉO TỚI ĐẦU BẾP → NẤU → KẾT QUẢ + XU.
     ///
-    ///   1. Order: chọn ngẫu nhiên một món (RecipeDefinition) — không lặp món vừa xong —
+    ///   0. Level (LevelDefinition): các nguyên liệu + các món của level. Bức vẽ CHỈ được so
+    ///      với nguyên liệu của level hiện tại. Làm đạt đủ dishesToComplete món thì sang
+    ///      level sau. Level hiện tại và tiến độ lưu bằng PlayerPrefs.
+    ///   1. Order: chọn ngẫu nhiên một món của level — không lặp món vừa xong —
     ///      hiện tên món và các nguyên liệu cần vẽ (kèm hình mẫu).
     ///   2. Drawing: vẽ lần lượt từng nguyên liệu trên DrawingCanvas. Bấm Done → chấm
-    ///      (ScoreSketch, so cả với mọi nguyên liệu khác trong các món).
+    ///      (ScoreSketch, so cả với các nguyên liệu khác CỦA LEVEL).
     ///   3. Judged: ĐẠT → bức vẽ biến thành DẠNG HOÀN THIỆN (SketchCleaner: tô phẳng,
     ///      không còn nét sáp, có viền). CHƯA ĐẠT → giữ nguyên nét sáp; người chơi vẽ
     ///      lại hoặc giữ nguyên để đi tiếp.
@@ -26,7 +29,8 @@ namespace ColorFood.Game
     ///
     /// Giao diện IMGUI (OnGUI) theo khung 1920×1080, co theo màn hình; không cần dựng UI
     /// trong scene. CÁCH DÙNG: gắn vào một GameObject rỗng trong scene đã có DrawingCanvas
-    /// (gán Palette) và EventSystem; kéo DrawingCanvas vào ô Canvas, các Recipe vào ô Recipes.
+    /// (gán Palette) và EventSystem; kéo DrawingCanvas vào ô Canvas, các Level vào ô Levels
+    /// (theo thứ tự). Không có Level nào thì dùng ô Recipes như một level duy nhất.
     /// PHÍM: Enter = nút chính của màn hiện tại.
     /// </summary>
     public class GameLoop : MonoBehaviour
@@ -52,6 +56,9 @@ namespace ColorFood.Game
         }
 
         [SerializeField] private DrawingCanvas canvas;
+        [Tooltip("Các level theo thứ tự chơi.")]
+        [SerializeField] private List<LevelDefinition> levels = new List<LevelDefinition>();
+        [Tooltip("Chỉ dùng khi chưa có Level nào: coi các món này là một level duy nhất.")]
         [SerializeField] private List<RecipeDefinition> recipes = new List<RecipeDefinition>();
 
         [Header("Rules")]
@@ -70,6 +77,8 @@ namespace ColorFood.Game
         [SerializeField] private bool disableTesters = true;
 
         private const string CoinsKey = "ColorFood.Coins";
+        private const string LevelKey = "ColorFood.Level";
+        private const string ProgressKey = "ColorFood.LevelProgress";
         private const float RefW = 1920f, RefH = 1080f;
 
         private State _state;
@@ -77,7 +86,13 @@ namespace ColorFood.Game
         private int _lastRecipe = -1;
         private readonly List<Slot> _slots = new List<Slot>();
         private int _current;                 // nguyên liệu đang vẽ
-        private readonly List<IngredientTemplate> _allIngredients = new List<IngredientTemplate>();
+        // Level hiện tại
+        private int _level;
+        private int _levelDone;                // số món đã làm đạt trong level
+        private bool _levelCleared;            // vừa đủ số món để qua level
+        private List<RecipeDefinition> _recipes = new List<RecipeDefinition>();
+        private List<IngredientTemplate> _pool = new List<IngredientTemplate>();   // chỉ so với các nguyên liệu này
+        private LevelDefinition CurrentLevel => _level >= 0 && _level < levels.Count ? levels[_level] : null;
 
         private int _coins;
         private DishOutcome _dish;
@@ -107,17 +122,14 @@ namespace ColorFood.Game
                 enabled = false;
                 return;
             }
+            levels = levels.FindAll(l => l != null && l.ValidRecipes.Count > 0);
             recipes = recipes.FindAll(r => r != null && r.IsValid);
-            if (recipes.Count == 0)
+            if (levels.Count == 0 && recipes.Count == 0)
             {
-                Debug.LogError("[GameLoop] Chưa có Recipe hợp lệ nào (mỗi món cần ít nhất một nguyên liệu đã vẽ có màu).");
+                Debug.LogError("[GameLoop] Chưa có Level (hoặc Recipe) hợp lệ nào — mỗi món cần ít nhất một nguyên liệu đã vẽ có màu.");
                 enabled = false;
                 return;
             }
-            // Mọi nguyên liệu của mọi món: dùng để so "vẽ nhầm thành nguyên liệu khác"
-            foreach (var r in recipes)
-                foreach (var t in r.ingredients)
-                    if (t != null && t.GetSketchShapes().Count > 0 && !_allIngredients.Contains(t)) _allIngredients.Add(t);
 
             if (disableTesters)
             {
@@ -126,6 +138,49 @@ namespace ColorFood.Game
             }
 
             _coins = PlayerPrefs.GetInt(CoinsKey, 0);
+            LoadLevel(Mathf.Clamp(PlayerPrefs.GetInt(LevelKey, 0), 0, Mathf.Max(0, levels.Count - 1)),
+                      PlayerPrefs.GetInt(ProgressKey, 0));
+            NextOrder();
+        }
+
+        /// <summary>Nạp level: món của level + tập nguyên liệu để so (chỉ nguyên liệu của level).</summary>
+        private void LoadLevel(int index, int done)
+        {
+            _level = index;
+            _levelDone = done;
+            _levelCleared = false;
+            _lastRecipe = -1;
+            if (CurrentLevel != null)
+            {
+                _recipes = CurrentLevel.ValidRecipes;
+                _pool = CurrentLevel.Pool();
+            }
+            else
+            {
+                _recipes = recipes;
+                _pool = new List<IngredientTemplate>();
+                foreach (var r in recipes)
+                    foreach (var t in r.ingredients)
+                        if (t != null && t.GetSketchShapes().Count > 0 && !_pool.Contains(t)) _pool.Add(t);
+            }
+            PlayerPrefs.SetInt(LevelKey, _level);
+            PlayerPrefs.SetInt(ProgressKey, _levelDone);
+            PlayerPrefs.Save();
+
+            var names = new List<string>();
+            foreach (var t in _pool) names.Add(t.DisplayNameOrId);
+            Debug.Log($"[GameLoop] {LevelName}: chấm chỉ so với {_pool.Count} nguyên liệu — {string.Join(", ", names)}");
+        }
+
+        private string LevelName => CurrentLevel != null ? CurrentLevel.levelName : "Level";
+        private int DishesToComplete => CurrentLevel != null ? CurrentLevel.dishesToComplete : 0;
+        private bool HasNextLevel => _level + 1 < levels.Count;
+
+        /// <summary>Sau màn kết quả: sang level mới nếu vừa qua level, rồi nhận đơn mới.</summary>
+        private void AfterDish()
+        {
+            if (_levelCleared && HasNextLevel) LoadLevel(_level + 1, 0);
+            else if (_levelCleared) _levelCleared = false;   // level cuối: chơi tiếp level này
             NextOrder();
         }
 
@@ -133,10 +188,10 @@ namespace ColorFood.Game
         {
             ReleaseSlots();
 
-            int i = Random.Range(0, recipes.Count);
-            if (recipes.Count > 1 && i == _lastRecipe) i = (i + 1 + Random.Range(0, recipes.Count - 1)) % recipes.Count;
+            int i = Random.Range(0, _recipes.Count);
+            if (_recipes.Count > 1 && i == _lastRecipe) i = (i + 1 + Random.Range(0, _recipes.Count - 1)) % _recipes.Count;
             _lastRecipe = i;
-            _recipe = recipes[i];
+            _recipe = _recipes[i];
 
             foreach (var t in _recipe.ingredients)
             {
@@ -177,7 +232,7 @@ namespace ColorFood.Game
         private void Submit()
         {
             Slot s = Current;
-            SketchResult r = canvas.ScoreSketch(s.Template, _allIngredients);
+            SketchResult r = canvas.ScoreSketch(s.Template, _pool);   // chỉ so với nguyên liệu của level
             if (r == null)
             {
                 _message = "Draw something first!";
@@ -239,8 +294,16 @@ namespace ColorFood.Game
                 PlayerPrefs.SetInt(CoinsKey, _coins);
                 PlayerPrefs.Save();
             }
+            if (_dish.Passed && CurrentLevel != null && !_levelCleared)
+            {
+                _levelDone++;
+                if (_levelDone >= DishesToComplete) _levelCleared = true;
+                PlayerPrefs.SetInt(ProgressKey, _levelDone);
+                PlayerPrefs.Save();
+            }
             Debug.Log($"[GameLoop] Món {_recipe.dishName}: {(_dish.Passed ? "ĐẠT" : "CHƯA ĐẠT")}, " +
-                      $"trung bình {_dish.Average:P0}, {_dish.Stars} sao, +{_dish.Coins} xu");
+                      $"trung bình {_dish.Average:P0}, {_dish.Stars} sao, +{_dish.Coins} xu" +
+                      (CurrentLevel != null ? $" | {LevelName}: {_levelDone}/{DishesToComplete}" : ""));
             _state = State.DishResult;
         }
 
@@ -256,7 +319,7 @@ namespace ColorFood.Game
                 case State.Judged:
                     if (Current.Passed) Continue(); else StartDrawing();
                     break;
-                case State.DishResult: NextOrder(); break;
+                case State.DishResult: AfterDish(); break;
             }
         }
 
@@ -369,6 +432,9 @@ namespace ColorFood.Game
             _h = Screen.height / scale;
 
             GUI.Label(new Rect(_w - 340, 16, 320, 50), "Coins: " + _coins, _big);
+            if (CurrentLevel != null)
+                GUI.Label(new Rect(_w - 340, 60, 320, 40),
+                          LevelName + "  " + Mathf.Min(_levelDone, DishesToComplete) + "/" + DishesToComplete + " dishes", _text);
 
             switch (_state)
             {
@@ -384,17 +450,28 @@ namespace ColorFood.Game
 
         private void DrawOrder()
         {
-            var box = new Rect(_w / 2 - 480, 120, 960, 760);
+            Texture2D dish = _recipe.dishImage;
+            var box = new Rect(_w / 2 - 520, 60, 1040, dish != null ? 960 : 760);
             GUI.Box(box, GUIContent.none, _box);
-            GUI.Label(new Rect(box.x, box.y + 24, box.width, 56), "NEW ORDER!", _title);
+            GUI.Label(new Rect(box.x, box.y + 24, box.width, 56),
+                      CurrentLevel != null ? LevelName + " — NEW ORDER!" : "NEW ORDER!", _title);
             GUI.Label(new Rect(box.x, box.y + 90, box.width, 50), _recipe.dishName, _big);
-            GUI.Label(new Rect(box.x, box.y + 150, box.width, 40), "Draw these ingredients:", _text);
 
-            float size = Mathf.Min(260f, (box.width - 80) / Mathf.Max(1, _slots.Count) - 20);
+            float y = box.y + 150;
+            if (dish != null)
+            {
+                GUI.DrawTexture(new Rect(box.center.x - 150, y, 300, 300), dish, ScaleMode.ScaleToFit);
+                y += 320;
+            }
+            GUI.Label(new Rect(box.x, y, box.width, 40), "Draw these ingredients:", _text);
+            y += 56;
+
+            float max = dish != null ? 190f : 260f;
+            float size = Mathf.Min(max, (box.width - 80) / Mathf.Max(1, _slots.Count) - 20);
             float x = box.center.x - (_slots.Count * (size + 20) - 20) / 2f;
             foreach (var s in _slots)
             {
-                var r = new Rect(x, box.y + 210, size, size);
+                var r = new Rect(x, y, size, size);
                 GUI.Box(r, GUIContent.none, _box);
                 if (s.Hint != null) GUI.DrawTextureWithTexCoords(Inset(r, 10), s.Hint, s.HintUv);
                 GUI.Label(new Rect(r.x - 20, r.yMax + 8, r.width + 40, 40), s.Name, _big);
@@ -504,6 +581,14 @@ namespace ColorFood.Game
             GUI.Label(new Rect(_w / 2 - 600, 30, 1200, 60), "Bring the ingredients to the chef!", _title);
             GUI.Label(new Rect(_w / 2 - 600, 90, 1200, 44), _recipe.dishName, _big);
             DrawChef("Drop ingredients here");
+            if (_recipe.dishImage != null)
+            {
+                // Mục tiêu: món sẽ nấu
+                var goal = new Rect(40, 40, 220, 220);
+                GUI.Box(goal, GUIContent.none, _box);
+                GUI.DrawTexture(Inset(goal, 12), _recipe.dishImage, ScaleMode.ScaleToFit);
+                GUI.Label(new Rect(goal.x, goal.yMax + 6, goal.width, 36), "Goal", _text);
+            }
 
             // Khay nguyên liệu
             float size = 220f;
@@ -562,6 +647,14 @@ namespace ColorFood.Game
             GUI.Label(new Rect(_w / 2 - 600, 30, 1200, 60), "Cooking " + _recipe.dishName + "...", _title);
             DrawChef("");
             float t = Mathf.Clamp01((Time.time - _cookStart) / Mathf.Max(0.01f, cookSeconds));
+            if (_recipe.dishImage != null)
+            {
+                // Món hiện dần theo tiến độ nấu
+                var old = GUI.color;
+                GUI.color = new Color(1f, 1f, 1f, t);
+                GUI.DrawTexture(new Rect(_w / 2 - 500 + 200, _h / 2 - 340, 300, 300), _recipe.dishImage, ScaleMode.ScaleToFit);
+                GUI.color = old;
+            }
             var track = new Rect(_w / 2 - 500, _h / 2, 700, 40);
             GUI.DrawTexture(track, Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0, new Color(0.85f, 0.85f, 0.85f), 0, 8);
             GUI.DrawTexture(new Rect(track.x, track.y, track.width * t, track.height), Texture2D.whiteTexture,
@@ -570,7 +663,8 @@ namespace ColorFood.Game
 
         private void DrawDishResult()
         {
-            var box = new Rect(_w / 2 - 560, 90, 1120, 880);
+            Texture2D dish = _recipe.dishImage;
+            var box = new Rect(_w / 2 - 560, dish != null ? 40 : 90, 1120, dish != null ? 1000 : 880);
             GUI.Box(box, GUIContent.none, _box);
             GUI.Label(new Rect(box.x, box.y + 20, box.width, 56), _recipe.dishName, _title);
             GUI.Label(new Rect(box.x, box.y + 84, box.width, 56), _dish.Passed ? "DISH COMPLETE!" : "THE DISH DIDN'T WORK OUT", _title);
@@ -580,23 +674,39 @@ namespace ColorFood.Game
                       "Average score: " + Pct(_dish.Average) + "    " +
                       (_dish.Coins > 0 ? "+" + _dish.Coins + " coins" : "No coins"), _big);
 
-            float size = Mathf.Min(240f, (box.width - 80) / Mathf.Max(1, _slots.Count) - 30);
+            float y = box.y + 280;
+            if (dish != null)
+            {
+                // Đạt: món hoàn chỉnh đủ màu. Không đạt: món xám mờ.
+                var old = GUI.color;
+                GUI.color = _dish.Passed ? Color.white : new Color(0.45f, 0.45f, 0.45f, 0.55f);
+                GUI.DrawTexture(new Rect(box.center.x - 130, y, 260, 260), dish, ScaleMode.ScaleToFit);
+                GUI.color = old;
+                y += 280;
+            }
+
+            float max = dish != null ? 150f : 240f;
+            float size = Mathf.Min(max, (box.width - 80) / Mathf.Max(1, _slots.Count) - 30);
             float x = box.center.x - (_slots.Count * (size + 30) - 30) / 2f;
             foreach (var s in _slots)
             {
-                var r = new Rect(x, box.y + 290, size, size);
+                var r = new Rect(x, y, size, size);
                 GUI.Box(r, GUIContent.none, _box);
                 if (s.Shown != null) GUI.DrawTextureWithTexCoords(Inset(r, 10), s.Shown, s.Uv);
-                GUI.Label(new Rect(r.x - 20, r.yMax + 6, r.width + 40, 40), s.Name, _big);
-                GUI.Label(new Rect(r.x - 20, r.yMax + 48, r.width + 40, 40),
+                GUI.Label(new Rect(r.x - 30, r.yMax + 6, r.width + 60, 40), s.Name, _big);
+                GUI.Label(new Rect(r.x - 30, r.yMax + 48, r.width + 60, 40),
                           (s.Passed ? "OK " : "Not quite ") + (s.Result != null ? Pct(s.Result.Total) : "-"), _text);
                 x += size + 30;
             }
             if (!_dish.Passed)
                 GUI.Label(new Rect(box.x + 40, box.yMax - 170, box.width - 80, 60),
                           "Every ingredient must pass for the dish to succeed.", _big);
-            if (GUI.Button(new Rect(box.center.x - 180, box.yMax - 96, 360, 70), "Next order (Enter)", _button))
-                NextOrder();
+            else if (_levelCleared)
+                GUI.Label(new Rect(box.x + 40, box.yMax - 170, box.width - 80, 60),
+                          HasNextLevel ? LevelName + " COMPLETE!" : "ALL LEVELS COMPLETE!", _title);
+            string next = _levelCleared && HasNextLevel ? "Next level (Enter)" : "Next order (Enter)";
+            if (GUI.Button(new Rect(box.center.x - 180, box.yMax - 96, 360, 70), next, _button))
+                AfterDish();
         }
 
         private void Tool(Rect r, DrawingCanvas.Tool tool, string label)

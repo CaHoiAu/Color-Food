@@ -724,6 +724,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   canvas: {fileID: 1199532455}
+  levels:
+  - {fileID: 11400000, guid: 5e479b4d04b1b97458de7911820fbd09, type: 2}
   recipes:
   - {fileID: 11400000, guid: 77708bc39a57da14b9ad27e34d7d3a67, type: 2}
   passThreshold: 0.7
